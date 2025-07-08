@@ -1,37 +1,30 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuthStore } from '../../stores/authStore';
 import { LoginCredentials } from '../../types/auth';
-import toast from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 
 export const LoginForm: React.FC = () => {
   const { register, handleSubmit, formState: { errors } } = useForm<LoginCredentials>();
-  const { signIn, isLoading, error } = useAuthStore();
+  const { signIn, isLoading, error, success, clearMessages } = useAuthStore();
   const navigate = useNavigate();
+
+  // Clear messages when component mounts
+  useEffect(() => {
+    clearMessages();
+  }, [clearMessages]);
 
   const onSubmit = async (data: LoginCredentials) => {
     try {
-      await signIn(data.email, data.password);
-      toast.success('Logged in successfully!');
-      navigate('/dashboard');
+      const result = await signIn(data.email, data.password);
+      
+      if (result.success) {
+        // Login was successful
+        navigate('/dashboard');
+      }
+      // If login failed, error is already set in the store
     } catch (error: any) {
       console.error('Login error:', error);
-      
-      // Show specific error messages
-      let errorMessage = 'Failed to login. Please try again.';
-      
-      if (error?.message) {
-        if (error.message.includes('Invalid login credentials')) {
-          errorMessage = 'Invalid email or password. Please try again.';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Please check your email and confirm your account before logging in.';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
-      toast.error(errorMessage);
     }
   };
 
@@ -47,7 +40,27 @@ export const LoginForm: React.FC = () => {
           </p>
         </div>
 
-        {error && (
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-green-800">
+                  Login successful!
+                </p>
+                <p className="mt-1 text-sm text-green-700">
+                  {success}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && !success && (
           <div className="bg-red-50 border border-red-200 rounded-md p-4">
             <div className="flex">
               <div className="flex-shrink-0">

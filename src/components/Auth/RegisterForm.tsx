@@ -1,51 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuthStore } from '../../stores/authStore';
 import { RegisterCredentials } from '../../types/auth';
-import toast from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 
 export const RegisterForm: React.FC = () => {
   const { register, handleSubmit, formState: { errors }, reset } = useForm<RegisterCredentials>();
-  const { signUp, isLoading, error } = useAuthStore();
+  const { signUp, isLoading, error, success, clearMessages } = useAuthStore();
   const navigate = useNavigate();
   const [isSuccess, setIsSuccess] = useState(false);
 
+  // Clear messages when component mounts
+  useEffect(() => {
+    clearMessages();
+  }, [clearMessages]);
+
   const onSubmit = async (data: RegisterCredentials) => {
     try {
-      await signUp(data.email, data.password, data.fullName);
+      const result = await signUp(data.email, data.password, data.fullName);
       
-      // If we reach here, registration was successful
-      setIsSuccess(true);
-      toast.success('Registration successful! Please check your email to verify your account.');
-      
-      // Clear the form
-      reset();
-      
-      // Redirect to login after a short delay
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
-      
+      if (result.success) {
+        // Registration was successful
+        setIsSuccess(true);
+        reset();
+        
+        // Redirect to login after a delay
+        setTimeout(() => {
+          navigate('/login');
+        }, 5000);
+      } else {
+        // Registration failed - error is already set in the store
+        setIsSuccess(false);
+      }
     } catch (error: any) {
       console.error('Registration error:', error);
-      
-      // Show specific error messages
-      let errorMessage = 'Registration failed. Please try again.';
-      
-      if (error?.message) {
-        if (error.message.includes('already registered')) {
-          errorMessage = 'This email is already registered. Please try logging in instead.';
-        } else if (error.message.includes('password')) {
-          errorMessage = 'Password must be at least 6 characters long.';
-        } else if (error.message.includes('email')) {
-          errorMessage = 'Please enter a valid email address.';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
-      toast.error(errorMessage);
+      setIsSuccess(false);
     }
   };
 
@@ -61,7 +50,7 @@ export const RegisterForm: React.FC = () => {
           </p>
         </div>
         
-        {isSuccess && (
+        {success && (
           <div className="bg-green-50 border border-green-200 rounded-md p-4">
             <div className="flex">
               <div className="flex-shrink-0">
@@ -74,14 +63,17 @@ export const RegisterForm: React.FC = () => {
                   Registration successful!
                 </p>
                 <p className="mt-1 text-sm text-green-700">
-                  Please check your email to verify your account. You'll be redirected to login shortly.
+                  {success}
+                </p>
+                <p className="mt-2 text-sm text-green-600">
+                  You'll be redirected to login in a few seconds...
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {error && !isSuccess && (
+        {error && !success && (
           <div className="bg-red-50 border border-red-200 rounded-md p-4">
             <div className="flex">
               <div className="flex-shrink-0">
