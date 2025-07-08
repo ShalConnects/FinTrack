@@ -88,14 +88,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
           if (profileError) {
             console.error('Error creating profile:', profileError);
-            // Don't fail registration if profile creation fails
-            // The user can still log in and we can create the profile later
+            // Provide specific error message based on the error
+            let errorMessage = 'Database error saving new user';
+            if (profileError.code === '23505') {
+              errorMessage = 'A user with this email already exists';
+            } else if (profileError.code === '23502') {
+              errorMessage = 'Missing required user information';
+            } else if (profileError.code === '42P01') {
+              errorMessage = 'User profile table not found - please contact support';
+            } else if (profileError.message) {
+              errorMessage = `Database error: ${profileError.message}`;
+            }
+            
+            set({ error: errorMessage, isLoading: false });
+            return { success: false, message: errorMessage };
           } else {
             console.log('Profile created successfully');
           }
         } catch (profileError) {
           console.error('Exception during profile creation:', profileError);
-          // Don't fail registration if profile creation fails
+          const errorMessage = 'Failed to create user profile. Please try again.';
+          set({ error: errorMessage, isLoading: false });
+          return { success: false, message: errorMessage };
         }
       }
 

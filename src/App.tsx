@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { useAuthStore } from './store/authStore';
 import { useFinanceStore } from './store/useFinanceStore';
@@ -15,6 +15,34 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import { LoadingProvider, useLoadingContext } from './context/LoadingContext';
 import { Loader } from './components/common/Loader';
+
+// Component to conditionally render Toaster
+const ConditionalToaster = () => {
+  const location = useLocation();
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/auth';
+  
+  if (isAuthPage) {
+    return null; // Don't show Toaster on auth pages
+  }
+  
+  return (
+            <Toaster 
+          position="top-right" 
+          richColors 
+          expand={true}
+          closeButton={true}
+          duration={4000}
+          theme="light"
+          style={{
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            fontSize: '14px',
+            fontWeight: '500',
+            marginTop: '40px'
+          }}
+        />
+  );
+};
 
 function AppContent() {
   const user = useAuthStore((state) => state.user);
@@ -156,21 +184,7 @@ function AppContent() {
       <Loader isLoading={globalLoading} message={loadingMessage} />
       
       <Router>
-        <Toaster 
-          position="top-right" 
-          richColors 
-          expand={true}
-          closeButton={true}
-          duration={4000}
-          theme="light"
-          style={{
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            fontSize: '14px',
-            fontWeight: '500',
-            marginTop: '40px'
-          }}
-        />
+        <ConditionalToaster />
         <Routes>
           <Route path="/" element={user ? <Navigate to="/dashboard" /> : <LandingPage />} />
           <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginForm />} />
