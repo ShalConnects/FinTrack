@@ -106,6 +106,13 @@ export const RegisterForm: React.FC = () => {
                 type="text"
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Full Name"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    const nextInput = e.currentTarget.nextElementSibling?.querySelector('input');
+                    if (nextInput) nextInput.focus();
+                  }
+                }}
               />
               {errors.fullName && (
                 <p className="mt-1 text-sm text-red-600">{errors.fullName.message}</p>
@@ -126,6 +133,13 @@ export const RegisterForm: React.FC = () => {
                 type="email"
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Email address"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    const nextInput = e.currentTarget.nextElementSibling?.querySelector('input');
+                    if (nextInput) nextInput.focus();
+                  }
+                }}
               />
               {errors.email && (
                 <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
@@ -146,6 +160,12 @@ export const RegisterForm: React.FC = () => {
                 type="password"
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Password"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    handleSubmit(onSubmit)();
+                  }
+                }}
               />
               {errors.password && (
                 <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>

@@ -61,33 +61,45 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
+        console.error('Supabase auth error:', error);
         set({ error: error.message, isLoading: false });
         return { success: false, message: error.message };
       }
 
       // Check if user was actually created
       if (!data.user) {
+        console.error('No user returned from signup');
         set({ error: 'Registration failed. Please try again.', isLoading: false });
         return { success: false, message: 'Registration failed. Please try again.' };
       }
 
-      // Create user profile
-      if (fullName) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            full_name: fullName,
-            email: email
-          });
+      console.log('User created successfully:', data.user.id);
 
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
-          // Still consider registration successful even if profile creation fails
+      // Create user profile with better error handling
+      if (fullName) {
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              full_name: fullName,
+              email: email
+            });
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+            // Don't fail registration if profile creation fails
+            // The user can still log in and we can create the profile later
+          } else {
+            console.log('Profile created successfully');
+          }
+        } catch (profileError) {
+          console.error('Exception during profile creation:', profileError);
+          // Don't fail registration if profile creation fails
         }
       }
 
-      const successMessage = 'Registration successful! Please check your email to verify your account before logging in.';
+      const successMessage = 'Registration successful! Please check your email inbox (and spam folder) to verify your account. You will be able to log in once you confirm your email address.';
       set({ 
         user: data.user, 
         isLoading: false, 
@@ -97,6 +109,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       return { success: true, message: successMessage };
     } catch (error) {
+      console.error('Registration exception:', error);
       const errorMessage = (error as Error).message;
       set({ error: errorMessage, isLoading: false });
       return { success: false, message: errorMessage };

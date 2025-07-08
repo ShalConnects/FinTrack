@@ -4,7 +4,8 @@ import { supabase } from './lib/supabase';
 import { useAuthStore } from './store/authStore';
 import { useFinanceStore } from './store/useFinanceStore';
 // import { urgentNotificationService } from './lib/urgentNotifications';
-import { Auth } from './pages/Auth';
+import { LoginForm } from './components/Auth/LoginForm';
+import { RegisterForm } from './components/Auth/RegisterForm';
 import { Dashboard } from './pages/Dashboard';
 import LandingPage from './pages/LandingPage';
 import { Toaster } from 'sonner';
@@ -172,8 +173,10 @@ function AppContent() {
         />
         <Routes>
           <Route path="/" element={user ? <Navigate to="/dashboard" /> : <LandingPage />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard/*" element={user ? <Dashboard /> : <Auth />} />
+          <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginForm />} />
+          <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <RegisterForm />} />
+          <Route path="/auth" element={user ? <Navigate to="/dashboard" /> : <LoginForm />} />
+          <Route path="/dashboard/*" element={user ? <Dashboard /> : <Navigate to="/login" />} />
           <Route path="/about" element={<About />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/privacypolicy" element={<PrivacyPolicy />} />
