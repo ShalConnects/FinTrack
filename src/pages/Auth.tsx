@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useThemeStore } from '../store/themeStore';
 import { useAuthStore } from '../store/authStore';
-import { toast } from 'sonner';
 import { LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import InteractiveBackground from '../components/InteractiveBackground';
 
@@ -179,10 +178,10 @@ export const Auth: React.FC = () => {
       });
       
       if (error) {
-        toast.error('Social login failed. Please try again.');
+        // toast.error('Social login failed. Please try again.'); // Removed toast
       }
     } catch (error) {
-      toast.error('An unexpected error occurred.');
+      // toast.error('An unexpected error occurred.'); // Removed toast
     }
   };
 
@@ -218,9 +217,9 @@ export const Auth: React.FC = () => {
       });
 
       if (error) {
-        toast.error(error.message);
+        // toast.error(error.message); // Removed toast
       } else {
-        toast.success('Account created—welcome aboard!');
+        // toast.success('Account created—welcome aboard!'); // Removed toast
         // Reset form
         setEmail('');
         setPassword('');
@@ -228,7 +227,7 @@ export const Auth: React.FC = () => {
         setSignupStep(1);
       }
     } catch (error) {
-      toast.error('An unexpected error occurred.');
+      // toast.error('An unexpected error occurred.'); // Removed toast
     }
   };
 
@@ -257,7 +256,7 @@ export const Auth: React.FC = () => {
 
       if (error) {
         console.error('Login error:', error);
-        toast.error('Invalid credentials. Please try again.');
+        // toast.error('Invalid credentials. Please try again.'); // Removed toast
       } else {
         console.log('Login successful, user:', data.user?.email);
         
@@ -290,11 +289,11 @@ export const Auth: React.FC = () => {
           setUserAndProfile(data.user, mappedProfile);
         }
         
-        toast.success('Welcome back!');
+        // toast.success('Welcome back!'); // Removed toast
       }
     } catch (error) {
       console.error('Unexpected login error:', error);
-      toast.error('An unexpected error occurred.');
+      // toast.error('An unexpected error occurred.'); // Removed toast
     }
   };
 
@@ -312,12 +311,12 @@ export const Auth: React.FC = () => {
       });
 
       if (error) {
-        toast.error(error.message);
+        // toast.error(error.message); // Removed toast
       } else {
-        toast.success('Password reset email sent! Check your inbox.');
+        // toast.success('Password reset email sent! Check your inbox.'); // Removed toast
       }
     } catch (error) {
-      toast.error('An unexpected error occurred.');
+      // toast.error('An unexpected error occurred.'); // Removed toast
     }
   };
 
