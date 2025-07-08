@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabase';
-import { useAuthStore } from './store/authStore';
+import { useAuthStore } from './stores/authStore';
 import { useFinanceStore } from './store/useFinanceStore';
 // import { urgentNotificationService } from './lib/urgentNotifications';
 import { LoginForm } from './components/Auth/LoginForm';

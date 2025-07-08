@@ -4,6 +4,7 @@ import { User } from '@supabase/supabase-js';
 
 interface AuthState {
   user: User | null;
+  profile: any | null;
   isLoading: boolean;
   error: string | null;
   success: string | null;
@@ -12,10 +13,12 @@ interface AuthState {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   clearMessages: () => void;
+  setUserAndProfile: (user: User | null, profile: any) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  profile: null,
   isLoading: false,
   error: null,
   success: null,
@@ -150,5 +153,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
     }
+  },
+
+  setUserAndProfile: (user: User | null, profile: any) => {
+    set({ user, profile });
   }
 })); 
