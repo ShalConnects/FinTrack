@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
-              const isAnalyticsActive = currentView === 'analytics' || currentView === 'purchase-analytics' || currentView === 'lend-borrow-analytics';
+              const isAnalyticsActive = Boolean(currentView === 'analytics' || currentView === 'purchase-analytics' || currentView === 'lend-borrow-analytics');
               
               return (
                 <div key={item.id}>
@@ -155,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
                       w-full flex items-center space-x-3 rounded-lg transition-all duration-200
                       ${isSidebarCollapsed ? 'px-2 py-3 justify-center' : 'px-4 py-3'}
                       ${isActive 
-                        ? 'bg-gradient-to-r from-blue-50 via-purple-50 to-blue-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-blue-900/20 text-gradient-primary border border-gradient-primary/30 dark:border-gradient-primary/40 shadow-sm' 
+                        ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-blue-500 dark:border-blue-400 text-gradient-primary font-semibold' 
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gradient-to-r hover:from-gray-50 hover:via-blue-50/30 hover:to-gray-50 dark:hover:from-gray-700/50 dark:hover:via-blue-900/10 dark:hover:to-gray-700/50 hover:text-gray-900 dark:hover:text-white'
                       }
                     `}

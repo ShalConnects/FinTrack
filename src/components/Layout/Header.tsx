@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Menu, Bell, Search, Sun, Moon, User, Settings, LogOut, ArrowLeftRight, LifeBuoy, Globe, Heart } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useThemeStore } from '../../store/themeStore';
-import { useAuthStore } from '../../store/authStore';
+import { useAuthStore } from '../../stores/authStore';
 import { NotificationDropdown } from './NotificationDropdown';
 import { ProfileEditModal } from './ProfileEditModal';
 import { useNavigate, Link } from 'react-router-dom';
@@ -27,7 +27,7 @@ const navigation = [
 export const Header: React.FC<HeaderProps> = ({ onMenuToggle, title, subtitle }) => {
   const { setGlobalSearchTerm, globalSearchTerm } = useFinanceStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
-  const { user, profile, logout } = useAuthStore();
+  const { user, profile, signOut } = useAuthStore();
   const { i18n, t } = useTranslation();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -109,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, title, subtitle })
   };
 
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     setShowUserMenu(false);
   };
 

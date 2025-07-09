@@ -30,10 +30,13 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon: Icon, label, onClick,
       style={{ transitionDelay: delay }}
       title={label}
     >
-      <span className={`${color} text-white p-2.5 rounded-full shadow-md flex items-center justify-center mr-3`}>
+      <span className={`${color} text-white p-2.5 rounded-full shadow-md flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-200`}>
         <Icon className="w-5 h-5" />
       </span>
-      <span className="px-4 py-2 rounded-lg text-sm font-medium shadow-sm border border-gray-700 transition-colors w-44 min-w-44 text-left flex-shrink-0" style={{ background: '#4c54618f', color: 'white' }}>
+      <span
+        className="px-4 py-2 rounded-lg text-sm font-medium shadow-sm border border-gray-700 transition-colors w-44 min-w-44 text-left flex-shrink-0 group-hover:bg-white/10 dark:group-hover:bg-gray-100/10 duration-150"
+        style={{ background: '#4c54618f', color: 'white' }}
+      >
         {label}
       </span>
     </button>
@@ -118,7 +121,7 @@ export const FloatingActionButton: React.FC = () => {
             leaveFrom="opacity-100 translate-y-0"
             leaveTo="opacity-0 translate-y-4"
           >
-            <div className="absolute bottom-full right-0 mb-4 p-4 rounded-2xl shadow-2xl flex flex-col gap-2 min-w-[220px] z-50 bg-gray-900/90 dark:bg-gray-900/90">
+            <div className="absolute bottom-full right-0 mb-4 p-4 rounded-2xl shadow-2xl flex flex-col gap-2 min-w-[220px] z-50 bg-gradient-primary">
               {actions.map((action) => (
                 <ActionButton key={action.label} {...action} />
               ))}
@@ -135,7 +138,7 @@ export const FloatingActionButton: React.FC = () => {
             {/* Main FAB Button */}
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="text-white p-3.5 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700/90 dark:hover:bg-gray-600"
+              className="text-white p-3.5 rounded-full shadow-lg bg-gradient-primary hover:bg-gradient-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus-ring-gradient"
               aria-label={isOpen ? 'Close actions' : 'Open actions'}
             >
               <Plus className={`w-5 h-5 transition-transform duration-200 ${isOpen ? 'rotate-45' : 'rotate-0'}`} />

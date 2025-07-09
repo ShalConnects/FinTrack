@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, Wallet, Target, Handshake, PiggyBank, Bell, Shield, Heart,
   Check, ChevronDown, ChevronUp, Star, ArrowRight, BarChart3, PieChart,
-  Users, Globe, Mail, Phone, Facebook, Twitter, Instagram, Linkedin, Github, ArrowUp
+  Users, Globe, Mail, Phone, Facebook, Twitter, Instagram, Linkedin, Github, ArrowUp, Moon, Sun
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import InteractiveBackground from '../components/InteractiveBackground';
+import { useThemeStore } from '../store/themeStore';
 
 const LandingPage: React.FC = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const navigate = useNavigate();
+  const { isDarkMode, toggleTheme } = useThemeStore();
 
   useEffect(() => {
     // Set Manrope font for the whole page
@@ -555,11 +557,24 @@ const LandingPage: React.FC = () => {
         </div>
       </footer>
 
-      {/* Back to Top Button */}
+      {/* Dark Mode Toggle Button - Always Visible */}
+      <button
+        onClick={toggleTheme}
+        className="fixed bottom-8 right-8 z-50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-600"
+        aria-label="Toggle dark mode"
+      >
+        {isDarkMode ? (
+          <Sun className="w-6 h-6" />
+        ) : (
+          <Moon className="w-6 h-6" />
+        )}
+      </button>
+
+      {/* Back to Top Button - Only visible when scrolling */}
       {showBackToTop && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="fixed bottom-8 right-8 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-3 rounded-full shadow-lg hover:from-blue-700 hover:to-purple-700 transition-colors"
+          className="fixed bottom-24 right-8 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-3 rounded-full shadow-lg hover:from-blue-700 hover:to-purple-700 transition-colors"
           aria-label="Back to top"
         >
           <ArrowUp className="w-6 h-6" />

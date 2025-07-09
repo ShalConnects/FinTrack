@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useThemeStore } from '../store/themeStore';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../stores/authStore';
 import { LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import InteractiveBackground from '../components/InteractiveBackground';
 
@@ -110,8 +110,18 @@ export const Auth: React.FC = () => {
   const passwordRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus first input on tab switch
+  const { signIn, signUp, isLoading, error, success, clearMessages } = useAuthStore();
+
+  // Debug: Log auth store state changes
   useEffect(() => {
+    console.log('Auth store state:', { error, success, isLoading });
+  }, [error, success, isLoading]);
+
+  // Auto-focus first input on tab switch and clear messages
+  useEffect(() => {
+    // Clear any existing messages when switching tabs
+    clearMessages();
+    
     const timer = setTimeout(() => {
       if (activeTab === 'login') {
         emailRef.current?.focus();
@@ -120,7 +130,7 @@ export const Auth: React.FC = () => {
       }
     }, 100);
     return () => clearTimeout(timer);
-  }, [activeTab, signupStep]);
+  }, [activeTab, signupStep, clearMessages]);
 
   // Email validation
   const validateEmail = (email: string) => {
@@ -206,28 +216,18 @@ export const Auth: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
-      });
-
-      if (error) {
-        // toast.error(error.message); // Removed toast
-      } else {
-        // toast.success('Account created—welcome aboard!'); // Removed toast
-        // Reset form
+      // Use the auth store's signUp method
+      const result = await signUp(email, password, fullName);
+      
+      if (result.success) {
+        // Reset form on success
         setEmail('');
         setPassword('');
         setFullName('');
         setSignupStep(1);
       }
     } catch (error) {
-      // toast.error('An unexpected error occurred.'); // Removed toast
+      console.error('Signup error:', error);
     }
   };
 
@@ -249,51 +249,15 @@ export const Auth: React.FC = () => {
 
     try {
       console.log('Attempting login for:', email);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error('Login error:', error);
-        // toast.error('Invalid credentials. Please try again.'); // Removed toast
-      } else {
-        console.log('Login successful, user:', data.user?.email);
-        
-        // Manually update the user state since auth state change might not fire immediately
-        if (data.user) {
-          const { setUserAndProfile } = useAuthStore.getState();
-          
-          // Fetch user profile
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-
-          if (profileError && profileError.code !== 'PGRST116') {
-            console.error('Error fetching profile:', profileError);
-          }
-
-          // Map DB fields to camelCase for the store
-          const mappedProfile = profile ? {
-            id: profile.id,
-            fullName: profile.full_name,
-            profilePicture: profile.profile_picture,
-            local_currency: profile.local_currency,
-            selected_currencies: profile.selected_currencies,
-            subscription: profile.subscription,
-          } : null;
-
-          console.log('Manually setting user and profile:', data.user.email);
-          setUserAndProfile(data.user, mappedProfile);
-        }
-        
-        // toast.success('Welcome back!'); // Removed toast
+      // Use the auth store's signIn method
+      const result = await signIn(email, password);
+      
+      if (result.success) {
+        console.log('Login successful');
+        // The auth store will handle navigation
       }
     } catch (error) {
       console.error('Unexpected login error:', error);
-      // toast.error('An unexpected error occurred.'); // Removed toast
     }
   };
 
@@ -318,6 +282,25 @@ export const Auth: React.FC = () => {
     } catch (error) {
       // toast.error('An unexpected error occurred.'); // Removed toast
     }
+  };
+
+  // Handle key down for input fields
+  const handleKeyDown = (e: React.KeyboardEvent, ref?: React.RefObject<HTMLInputElement>) => {
+    if (e.key === 'Enter' && ref) {
+      ref.current?.focus();
+    } else if (e.key === 'Enter' && activeTab === 'signup' && signupStep === 2) {
+      handleSignUp(e as React.FormEvent);
+    } else if (e.key === 'Enter' && activeTab === 'login') {
+      handleLogIn(e as React.FormEvent);
+    }
+  };
+
+  // Inline feedback logic
+  const getLoginErrorMessage = () => {
+    if (error && typeof error === 'string' && error.toLowerCase().includes('email not confirmed')) {
+      return 'Please confirm your email before logging in.';
+    }
+    return error;
   };
 
   return (
@@ -413,7 +396,41 @@ export const Auth: React.FC = () => {
             </div>
           </div>
 
-          {/* Login Form */}
+          {/* Feedback Messages */}
+          {activeTab === 'signup' && (success || error) && (
+            <div className={`rounded-md p-4 mb-4 border ${success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  {success ? (
+                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <div className="ml-3">
+                  <p className={`text-sm font-medium ${success ? 'text-green-800' : 'text-red-800'}`}>{success || error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          {activeTab === 'login' && error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-red-800">{getLoginErrorMessage()}</p>
+                </div>
+              </div>
+            </div>
+          )}
           {activeTab === 'login' && (
             <form onSubmit={handleLogIn} className="space-y-4">
               <div>
@@ -429,6 +446,7 @@ export const Auth: React.FC = () => {
                     setEmail(e.target.value);
                     setEmailError(validateEmail(e.target.value));
                   }}
+                  onKeyDown={e => handleKeyDown(e)}
                   placeholder="Email address"
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm ${
                     emailError
@@ -459,6 +477,7 @@ export const Auth: React.FC = () => {
                       setPassword(e.target.value);
                       setPasswordError(validatePassword(e.target.value));
                     }}
+                    onKeyDown={e => handleKeyDown(e)}
                     placeholder="Password"
                     className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm ${
                       passwordError
@@ -534,7 +553,15 @@ export const Auth: React.FC = () => {
                       id="signup-email"
                       type="email"
                       value={email}
-                      onChange={(e) => handleEmailChange(e.target.value)}
+                      onChange={e => setEmail(e.target.value)}
+                      onKeyDown={e => {
+                        if (activeTab === 'signup' && signupStep === 1 && e.key === 'Enter') {
+                          e.preventDefault();
+                          handleContinue();
+                        } else {
+                          handleKeyDown(e);
+                        }
+                      }}
                       placeholder="Enter your email"
                       className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm ${
                         emailError
@@ -577,6 +604,7 @@ export const Auth: React.FC = () => {
                         setFullName(e.target.value);
                         setNameError(validateName(e.target.value));
                       }}
+                      onKeyDown={e => handleKeyDown(e, passwordRef)}
                       placeholder="Full name"
                       className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm ${
                         nameError
@@ -607,6 +635,7 @@ export const Auth: React.FC = () => {
                           setPassword(e.target.value);
                           setPasswordError(validatePassword(e.target.value));
                         }}
+                        onKeyDown={e => handleKeyDown(e)}
                         placeholder="Create a password"
                         className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm ${
                           passwordError
@@ -673,3 +702,5 @@ export const Auth: React.FC = () => {
     </div>
   );
 };
+
+export default Auth;

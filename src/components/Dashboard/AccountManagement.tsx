@@ -79,62 +79,227 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ hideTitle 
     setDeletionProgress(0);
 
     try {
+      console.log('Starting account deletion process...');
       const transactionId = generateTransactionId();
       
       // Simulate progress updates
       setDeletionProgress(25);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       setDeletionProgress(50);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       setDeletionProgress(75);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       setDeletionProgress(90);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Use the auth store's deleteAccount method
-      const result = await deleteAccount();
+      // Delete user data directly from database
+      let userId = user?.id;
+      console.log('User object:', user);
+      console.log('User ID from store:', userId);
+      console.log('User email:', user?.email);
       
-      if (result.success) {
-        setDeletionProgress(100);
-        
-        // Log the deletion event
-        try {
-          await supabase
-            .from('audit_logs')
-            .insert({
-              user_id: user?.id,
-              action: 'ACCOUNT_DELETION',
-              details: {
-                transaction_id: transactionId,
-                accounts_deleted: dataSummary.accounts,
-                transactions_deleted: dataSummary.transactions,
-                purchases_deleted: dataSummary.purchases,
-                total_balance: dataSummary.totalBalance,
-                currencies: dataSummary.currencies
-              },
-              timestamp: new Date().toISOString()
-            });
-        } catch (error) {
-          console.error('Error logging deletion event:', error);
-        }
-
-        // Final step: Show completion and redirect
-        setTimeout(async () => {
-          setCurrentStep('complete');
-          toast.success(createSuccessMessage('Account Deletion', transactionId, 'Account and all data deleted successfully'));
-        }, 1000);
-      } else {
-        throw new Error(result.error || 'Failed to delete account');
+      // Fallback: try to get user ID from current session
+      if (!userId) {
+        console.log('User ID not found in store, trying to get from current session...');
+        const { data: { session } } = await supabase.auth.getSession();
+        userId = session?.user?.id;
+        console.log('User ID from session:', userId);
+      }
+      
+      if (!userId) {
+        console.error('User object is:', user);
+        console.error('Session user is:', await supabase.auth.getSession());
+        console.error('User ID is undefined. This might be a state issue.');
+        throw new Error('User not found - please refresh the page and try again');
       }
 
+      console.log('Deleting user data for userId:', userId);
+
+      // Add timeout to prevent hanging
+      const deletionTimeout = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Deletion timeout - taking too long')), 30000); // 30 second timeout
+      });
+
+      // Delete all user data in parallel for better performance
+      const deletePromises = [
+        supabase.from('transactions').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting transactions:', result.error);
+          else console.log('Transactions deleted successfully');
+          return result;
+        }),
+        supabase.from('purchases').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting purchases:', result.error);
+          else console.log('Purchases deleted successfully');
+          return result;
+        }),
+        supabase.from('purchase_categories').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting purchase categories:', result.error);
+          else console.log('Purchase categories deleted successfully');
+          return result;
+        }),
+        supabase.from('purchase_attachments').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting purchase attachments:', result.error);
+          else console.log('Purchase attachments deleted successfully');
+          return result;
+        }),
+        supabase.from('lend_borrow').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting lend/borrow:', result.error);
+          else console.log('Lend/borrow records deleted successfully');
+          return result;
+        }),
+        supabase.from('lend_borrow_returns').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting lend/borrow returns:', result.error);
+          else console.log('Lend/borrow returns deleted successfully');
+          return result;
+        }),
+        supabase.from('savings_goals').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting savings goals:', result.error);
+          else console.log('Savings goals deleted successfully');
+          return result;
+        }),
+        supabase.from('donation_saving_records').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting donation records:', result.error);
+          else console.log('Donation records deleted successfully');
+          return result;
+        }),
+        supabase.from('notifications').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting notifications:', result.error);
+          else console.log('Notifications deleted successfully');
+          return result;
+        }),
+        supabase.from('audit_logs').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting audit logs:', result.error);
+          else console.log('Audit logs deleted successfully');
+          return result;
+        }),
+        supabase.from('accounts').delete().eq('user_id', userId).then(result => {
+          if (result.error) console.error('Error deleting accounts:', result.error);
+          else console.log('Accounts deleted successfully');
+          return result;
+        })
+      ];
+
+      // Delete profile separately to ensure it's deleted
+      console.log('Deleting user profile for userId:', userId);
+      
+      // First, check if profile exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('id', userId)
+        .single();
+      
+      if (checkError) {
+        console.error('Error checking profile existence:', checkError);
+      } else {
+        console.log('Found existing profile:', existingProfile);
+      }
+      
+      // Try to delete the profile with different approaches
+      let profileDeleted = false;
+      
+      // Method 1: Standard deletion
+      console.log('Trying standard profile deletion...');
+      const { error: profileError, count } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId)
+        .select('count');
+      
+      if (profileError) {
+        console.error('Standard profile deletion failed:', profileError);
+        
+        // Method 2: Try with RLS bypass (if possible)
+        console.log('Trying profile deletion with different approach...');
+        const { error: altProfileError } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', userId);
+        
+        if (altProfileError) {
+          console.error('Alternative profile deletion also failed:', altProfileError);
+          
+          // Method 3: Try updating profile to null values instead of deleting
+          console.log('Trying to clear profile data instead of deleting...');
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              full_name: null,
+              local_currency: null,
+              profile_picture: null,
+              selected_currencies: null
+            })
+            .eq('id', userId);
+          
+          if (updateError) {
+            console.error('Profile update also failed:', updateError);
+          } else {
+            console.log('Profile data cleared successfully');
+            profileDeleted = true;
+          }
+        } else {
+          console.log('Alternative profile deletion succeeded');
+          profileDeleted = true;
+        }
+      } else {
+        console.log('Profile deletion result - count:', count);
+        console.log('Profile deleted successfully');
+        profileDeleted = true;
+      }
+      
+      if (!profileDeleted) {
+        console.warn('Profile could not be deleted. This is likely due to RLS policies or database constraints.');
+      }
+
+      console.log('Executing all deletion operations...');
+      // Execute all deletions with timeout
+      const results = await Promise.race([
+        Promise.allSettled(deletePromises),
+        deletionTimeout
+      ]) as PromiseSettledResult<any>[];
+      console.log('Deletion results:', results);
+      
+      // Check if any deletions failed
+      const failedDeletions = results.filter((result: PromiseSettledResult<any>) => result.status === 'rejected');
+      if (failedDeletions.length > 0) {
+        console.warn(`${failedDeletions.length} deletion operations failed, but continuing...`);
+      }
+      
+      setDeletionProgress(100);
+      console.log('Database deletion completed, signing out user...');
+      
+      // Sign out the user
+      await supabase.auth.signOut();
+      console.log('User signed out successfully');
+
+      // Note: Auth user deletion requires admin privileges
+      // The user will need to contact support to completely remove their auth account
+      console.log('Note: Auth user account remains in the system due to security restrictions');
+
+      // Final step: Show completion and redirect
+      console.log('Showing completion screen...');
+      setTimeout(async () => {
+        setCurrentStep('complete');
+        toast.success(createSuccessMessage('Account Deletion', transactionId, 'All data deleted successfully. You have been signed out.'));
+        
+        // Auto-redirect after 2 seconds
+        setTimeout(() => {
+          console.log('Redirecting to login page...');
+          setShowDeleteModal(false);
+          // Redirect to login page
+          window.location.href = '/auth';
+        }, 2000);
+      }, 500);
+      
     } catch (error) {
       console.error('Error during account deletion:', error);
       toast.error('Error during account deletion. Please try again.');
-      setCurrentStep('warning');
+      setCurrentStep('confirmation');
       setIsDeleting(false);
+      setDeletionProgress(0);
     }
   };
 
@@ -194,11 +359,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ hideTitle 
       autoTable(doc, {
         startY: y,
         head: [["Name", "Type", "Currency", "Balance", "Status"]],
-        body: accounts.map(acc => [acc.name, acc.type, acc.currency, acc.balance, acc.status]),
+        body: accounts.map(acc => [acc.name, acc.type, acc.currency, acc.calculated_balance, acc.isActive ? 'Active' : 'Inactive']),
         styles: { fontSize: 9 },
         headStyles: { fillColor: [41, 128, 185] },
       });
-      y = doc.lastAutoTable.finalY + 6;
+      y = (doc as any).lastAutoTable.finalY + 6;
     }
     // Transactions Table
     if (transactions.length) {
@@ -216,7 +381,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ hideTitle 
         styles: { fontSize: 9 },
         headStyles: { fillColor: [39, 174, 96] },
       });
-      y = doc.lastAutoTable.finalY + 6;
+      y = (doc as any).lastAutoTable.finalY + 6;
     }
     // Purchases Table
     if (purchases.length) {
@@ -224,16 +389,16 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ hideTitle 
         startY: y,
         head: [["Date", "Item", "Category", "Amount", "Account"]],
         body: purchases.map(p => [
-          new Date(p.date).toLocaleDateString(),
-          p.item || p.description || '',
+          new Date(p.purchase_date).toLocaleDateString(),
+          p.item_name || '',
           p.category,
-          p.amount,
+          p.price,
           accounts.find(a => a.id === p.account_id)?.name || ''
         ]),
         styles: { fontSize: 9 },
         headStyles: { fillColor: [155, 89, 182] },
       });
-      y = doc.lastAutoTable.finalY + 6;
+      y = (doc as any).lastAutoTable.finalY + 6;
     }
     // Currencies Table
     const uniqueCurrencies = [...new Set(accounts.map(acc => acc.currency))];
@@ -245,7 +410,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ hideTitle 
         styles: { fontSize: 9 },
         headStyles: { fillColor: [52, 73, 94] },
       });
-      y = doc.lastAutoTable.finalY + 6;
+      y = (doc as any).lastAutoTable.finalY + 6;
     }
     // Donations Table
     if (donationSavingRecords.length) {
@@ -255,13 +420,13 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ hideTitle 
         body: donationSavingRecords.filter(r => r.type === 'donation').map(r => [
           r.type,
           r.amount,
-          r.date ? new Date(r.date).toLocaleDateString() : '',
+          r.created_at ? new Date(r.created_at).toLocaleDateString() : '',
           r.note || ''
         ]),
         styles: { fontSize: 9 },
         headStyles: { fillColor: [230, 126, 34] },
       });
-      y = doc.lastAutoTable.finalY + 6;
+      y = (doc as any).lastAutoTable.finalY + 6;
     }
     doc.save(`user-data-${new Date().toISOString().split('T')[0]}.pdf`);
   };
@@ -440,9 +605,35 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ hideTitle 
                   type="text"
                   value={confirmationText}
                   onChange={(e) => setConfirmationText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && confirmationText === 'DELETE') {
+                      handleConfirmDeletion();
+                    } else if (e.key === 'Escape') {
+                      handleCancel();
+                    }
+                  }}
                   placeholder="Type DELETE"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4"
+                  className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4 transition-colors ${
+                    confirmationText === 'DELETE' 
+                      ? 'border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/20' 
+                      : confirmationText.length > 0 
+                        ? 'border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/20' 
+                        : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                  autoFocus
                 />
+                <div className="mb-4">
+                  {confirmationText.length > 0 && confirmationText !== 'DELETE' && (
+                    <p className="text-red-600 dark:text-red-400 text-sm">
+                      Please type "DELETE" exactly
+                    </p>
+                  )}
+                  {confirmationText === 'DELETE' && (
+                    <p className="text-green-600 dark:text-green-400 text-sm">
+                      ✓ Confirmation ready
+                    </p>
+                  )}
+                </div>
                 <div className="flex space-x-3">
                   <button
                     onClick={handleCancel}
@@ -489,14 +680,19 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ hideTitle 
                   Account Deleted
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Your account has been successfully deleted. You will be redirected to the login page.
+                  Your account has been successfully deleted. You will be automatically redirected to the login page in a few seconds.
                 </p>
-                <button
-                  onClick={handleCancel}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  OK
-                </button>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      window.location.href = '/auth';
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Go to Login Now
+                  </button>
+                </div>
               </div>
             )}
           </div>

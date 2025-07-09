@@ -14,6 +14,7 @@ interface AuthState {
   resetPassword: (email: string) => Promise<void>;
   clearMessages: () => void;
   setUserAndProfile: (user: User | null, profile: any) => void;
+  fetchProfile: (userId: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -36,13 +37,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
+        // For testing: You can temporarily bypass email confirmation errors
+        // by commenting out this error handling and allowing unconfirmed users
+        console.error('Sign in error:', error);
         set({ error: error.message, isLoading: false });
         return { success: false, message: error.message };
       }
-      
-      set({ user: data.user, isLoading: false, success: 'Login successful!' });
+
+      console.log('Sign in successful:', data.user?.id);
+      set({ user: data.user, isLoading: false });
       return { success: true };
     } catch (error) {
+      console.error('Sign in exception:', error);
       const errorMessage = (error as Error).message;
       set({ error: errorMessage, isLoading: false });
       return { success: false, message: errorMessage };
@@ -77,44 +83,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       console.log('User created successfully:', data.user.id);
-
-      // Create user profile with better error handling
-      if (fullName) {
-        try {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              full_name: fullName,
-              email: email
-            });
-
-          if (profileError) {
-            console.error('Error creating profile:', profileError);
-            // Provide specific error message based on the error
-            let errorMessage = 'Database error saving new user';
-            if (profileError.code === '23505') {
-              errorMessage = 'A user with this email already exists';
-            } else if (profileError.code === '23502') {
-              errorMessage = 'Missing required user information';
-            } else if (profileError.code === '42P01') {
-              errorMessage = 'User profile table not found - please contact support';
-            } else if (profileError.message) {
-              errorMessage = `Database error: ${profileError.message}`;
-            }
-            
-            set({ error: errorMessage, isLoading: false });
-            return { success: false, message: errorMessage };
-          } else {
-            console.log('Profile created successfully');
-          }
-        } catch (profileError) {
-          console.error('Exception during profile creation:', profileError);
-          const errorMessage = 'Failed to create user profile. Please try again.';
-          set({ error: errorMessage, isLoading: false });
-          return { success: false, message: errorMessage };
-        }
-      }
+      console.log('Profile will be created automatically by database trigger');
 
       const successMessage = 'Registration successful! Please check your email inbox (and spam folder) to verify your account. You will be able to log in once you confirm your email address.';
       set({ 
@@ -138,7 +107,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      set({ user: null, isLoading: false });
+      set({ user: null, profile: null, isLoading: false });
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
     }
@@ -155,7 +124,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  // Fetch and map profile from Supabase
+  fetchProfile: async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (data) {
+      // Map snake_case to camelCase
+      const profile = {
+        ...data,
+        fullName: data.full_name,
+        profilePicture: data.profile_picture,
+      };
+      set({ profile });
+    } else {
+      set({ profile: null });
+    }
+  },
+
   setUserAndProfile: (user: User | null, profile: any) => {
-    set({ user, profile });
+    set({ user });
+    if (user) {
+      // Always fetch and map the profile when a user is set
+      get().fetchProfile(user.id);
+    } else {
+      set({ profile: null });
+    }
   }
 })); 
