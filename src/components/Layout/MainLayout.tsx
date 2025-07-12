@@ -21,6 +21,26 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState(location.pathname.split('/')[2] || 'dashboard');
   const { isSidebarCollapsed } = useThemeStore();
+  
+  // Check if screen is mobile/tablet (≤767px)
+  const [isMobile, setIsMobile] = useState(false);
+  const [isVerySmall, setIsVerySmall] = useState(false);
+  
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      setIsMobile(width <= 767);
+      setIsVerySmall(width <= 468);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+  
+  // Force collapse on mobile
+  const effectiveCollapsed = isMobile || isSidebarCollapsed;
 
   // Sync route with currentView
   useEffect(() => {
@@ -95,41 +115,72 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }
   };
 
+  // Prevent background scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isMobile && isSidebarOpen) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, [isMobile, isSidebarOpen]);
+
   return (
-    <div className="h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden">
-      <aside className={`fixed inset-y-0 left-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-30 transition-all duration-300 ease-in-out ${
-        isSidebarCollapsed ? 'w-16' : 'w-52'
-      }`}>
-        <Sidebar 
-          isOpen={isSidebarOpen} 
-          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-          currentView={currentView}
-          onViewChange={handleViewChange}
-        />
-      </aside>
-      
-      <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-        isSidebarCollapsed ? 'ml-16' : 'ml-52'
-      }`}>
-        <Header 
-          onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
-          title={getTitle()}
-          subtitle={currentView === 'donations-savings' ? 'See the donation amount you gave from your income' : (
-            currentView === 'accounts'
-              ? 'Manage your financial accounts'
-              : currentView === 'transactions'
-                ? 'Track and manage all your financial transactions'
-                : currentView === 'purchases'
-                  ? 'Track and manage all your purchases.'
-                  : currentView === 'lend-borrow'
-                    ? 'Track and manage all your lending and borrowing activities'
-                    : undefined
-          )}
-        />
-        <main className="flex-1 p-4 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-          {children}
-        </main>
+    <>
+      <div className="h-screen bg-gray-50 dark:bg-gray-900 flex overflow-hidden">
+        {/* Sidebar for desktop only */}
+        {!isMobile && (
+          <aside className={`fixed inset-y-0 left-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-30 transition-all duration-300 ease-in-out ${
+            effectiveCollapsed ? 'w-16' : 'w-52'
+          }`}>
+            <Sidebar 
+              isOpen={true} 
+              onToggle={() => {}} // No toggle on desktop
+              currentView={currentView}
+              onViewChange={handleViewChange}
+            />
+          </aside>
+        )}
+        {/* Main content */}
+        <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
+          !isMobile ? (effectiveCollapsed ? 'ml-16' : 'ml-52') : ''
+        }`}>
+          <Header 
+            onMenuToggle={() => setIsSidebarOpen(true)} 
+            title={getTitle()}
+            subtitle={currentView === 'donations-savings' ? 'See the donation amount you gave from your income' : (
+              currentView === 'accounts'
+                ? 'Manage your financial accounts'
+                : currentView === 'transactions'
+                  ? 'Track and manage all your financial transactions'
+                  : currentView === 'purchases'
+                    ? 'Track and manage all your purchases.'
+                    : currentView === 'lend-borrow'
+                      ? 'Track and manage all your lending and borrowing activities'
+                      : undefined
+            )}
+          />
+          <main className="flex-1 p-2 sm:p-4 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+      {/* Mobile sidebar overlay rendered outside the main flex container */}
+      {isMobile && isSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <aside className="w-52 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <Sidebar 
+              isOpen={isSidebarOpen} 
+              onToggle={() => setIsSidebarOpen(false)}
+              currentView={currentView}
+              onViewChange={handleViewChange}
+            />
+          </aside>
+          <div className="flex-1 h-full bg-black bg-opacity-50" onClick={() => setIsSidebarOpen(false)} />
+        </div>
+      )}
+    </>
   );
 }; 

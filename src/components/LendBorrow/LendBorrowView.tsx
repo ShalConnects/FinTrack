@@ -9,6 +9,7 @@ import { LendBorrowList } from './LendBorrowList';
 import { PartialReturnModal } from './PartialReturnModal';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { toast } from 'sonner';
+import { useLoadingContext } from '../../context/LoadingContext';
 
 const currencySymbols: Record<string, string> = {
   USD: '$',
@@ -48,6 +49,7 @@ export const LendBorrowView: React.FC = () => {
   const typeMenuRef = useRef<HTMLDivElement>(null);
   const statusMenuRef = useRef<HTMLDivElement>(null);
   const { profile } = useAuthStore();
+  const { wrapAsync, setLoadingMessage } = useLoadingContext();
 
   // Only show selected_currencies if available, else all
   const allCurrencyOptions = [
@@ -307,6 +309,9 @@ export const LendBorrowView: React.FC = () => {
     try {
       console.log('Attempting to add record:', cleanRecord);
 
+      // Add a small delay to ensure loading animation is visible
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       const { data, error } = await supabase
         .from('lend_borrow')
         .insert([cleanRecord])
@@ -351,6 +356,9 @@ export const LendBorrowView: React.FC = () => {
     try {
       console.log('Attempting to update record:', { id, updates: cleanUpdates });
 
+      // Add a small delay to ensure loading animation is visible
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       const { data, error } = await supabase
         .from('lend_borrow')
         .update(cleanUpdates)
@@ -387,28 +395,35 @@ export const LendBorrowView: React.FC = () => {
   const handleDeleteRecord = async (id: string) => {
     if (!user) return;
 
-    try {
-      console.log('Attempting to delete record:', id);
+    // Wrap the delete process with loading state
+    const wrappedDelete = wrapAsync(async () => {
+      setLoadingMessage('Deleting record...');
+      try {
+        console.log('Attempting to delete record:', id);
 
-      const { error } = await supabase
-        .from('lend_borrow')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
+        const { error } = await supabase
+          .from('lend_borrow')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', user.id);
 
-      if (error) {
-        console.error('Supabase error:', error);
-        toast.error('Error deleting record: ' + error.message);
-        throw error;
+        if (error) {
+          console.error('Supabase error:', error);
+          toast.error('Error deleting record: ' + error.message);
+          throw error;
+        }
+
+        console.log('Successfully deleted record:', id);
+        setLendBorrowRecords(prev => prev.filter(r => r.id !== id));
+        toast.success('Record deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting lend/borrow record:', error);
+        toast.error('Failed to delete record. Please try again.');
       }
-
-      console.log('Successfully deleted record:', id);
-      setLendBorrowRecords(prev => prev.filter(r => r.id !== id));
-      toast.success('Record deleted successfully!');
-    } catch (error) {
-      console.error('Error deleting lend/borrow record:', error);
-      toast.error('Failed to delete record. Please try again.');
-    }
+    });
+    
+    // Execute the wrapped delete function
+    await wrappedDelete();
   };
 
   // Update status

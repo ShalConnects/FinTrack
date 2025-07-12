@@ -101,8 +101,8 @@ export const LendBorrowSummaryCard: React.FC = () => {
         <div className="text-center text-gray-400 py-8">Loading...</div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="relative">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 mb-6">
+            <div className="w-full relative">
               <StatCard
                 title={<div className="flex items-center">Total Lend
                   <div className="relative">
@@ -139,7 +139,7 @@ export const LendBorrowSummaryCard: React.FC = () => {
                 color="green"
               />
             </div>
-            <div className="relative">
+            <div className="w-full relative">
               <StatCard
                 title={<div className="flex items-center">Total Borrowed
                   <div className="relative">

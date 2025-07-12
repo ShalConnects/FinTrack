@@ -184,10 +184,11 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
     console.log('Account fields:', data?.[0] ? Object.keys(data[0]) : 'No accounts');
 
     // Do not filter out DPS savings accounts; include all accounts
+    // When mapping from db, map is_active to isActive
     const accounts = data.map(account => ({
       ...account,
       id: account.account_id, // Use account_id from the view
-      isActive: account.is_active,
+      isActive: account.is_active, // Map db to frontend
       calculated_balance: Number(account.calculated_balance) || 0,
       initial_balance: Number(account.initial_balance) || 0,
       has_dps: Boolean(account.has_dps),
@@ -230,6 +231,11 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
       
       // Remove dps_initial_balance from main account object
       const { dps_initial_balance, transaction_id, ...mainAccountData } = account;
+      // Map isActive to is_active for Supabase
+      if ('isActive' in mainAccountData) {
+        (mainAccountData as any).is_active = (mainAccountData as any).isActive;
+        delete (mainAccountData as any).isActive;
+      }
       console.log('Main account data to insert:', mainAccountData);
       
       // First create the main account (do not deduct DPS initial)
@@ -327,7 +333,12 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
         dbUpdates = rest;
         dps_initial_balance = dpsInit;
       }
-      const supabaseUpdates = { ...dbUpdates, is_active: updates.isActive };
+      // Use is_active for Supabase update
+      const supabaseUpdates = { ...dbUpdates };
+      if (typeof updates.isActive !== 'undefined') {
+        supabaseUpdates.is_active = updates.isActive;
+        delete supabaseUpdates.isActive;
+      }
       dbUpdates.has_dps = updates.has_dps || false;
       dbUpdates.dps_type = updates.has_dps ? updates.dps_type : null;
       dbUpdates.dps_amount_type = updates.has_dps ? updates.dps_amount_type : null;
@@ -383,7 +394,7 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
       // Update the account
       const { error } = await supabase
         .from('accounts')
-        .update(supabaseUpdates)
+        .update(supabaseUpdates as any)
         .eq('id', id);
 
       if (error) throw error;
@@ -1320,6 +1331,9 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
       return;
     }
 
+    // Add a small delay to ensure the loading animation is visible
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     await get().fetchPurchases();
     set({ loading: false });
   },
@@ -1337,6 +1351,9 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
       set({ loading: false, error: errorMessage });
       return undefined;
     }
+    
+    // Add a small delay to ensure the loading animation is visible
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     await get().fetchPurchases();
     set({ loading: false });
@@ -1367,6 +1384,9 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
       set({ loading: false, error: error.message });
       return undefined;
     }
+    
+    // Add a small delay to ensure the loading animation is visible
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     await Promise.all([
       get().fetchPurchases(),

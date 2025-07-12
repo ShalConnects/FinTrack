@@ -9,6 +9,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { parseISO } from 'date-fns';
 import { useAuthStore } from '../../store/authStore';
+import { Loader } from '../../components/common/Loader';
 
 interface LendBorrowFormProps {
   record?: LendBorrow;
@@ -116,8 +117,12 @@ export const LendBorrowForm: React.FC<LendBorrowFormProps> = ({ record, onClose,
     }
     setSubmitting(true);
     try {
+      // Add a small delay to ensure loading animation is visible
+      await new Promise(resolve => setTimeout(resolve, 500));
       await onSubmit(form);
       toast.success(record ? 'Record updated successfully!' : 'Record added successfully!');
+      // Add a small delay before closing to show success state
+      await new Promise(resolve => setTimeout(resolve, 300));
       onClose();
     } catch (error) {
       console.error('Error saving record:', error);
@@ -147,220 +152,223 @@ export const LendBorrowForm: React.FC<LendBorrowFormProps> = ({ record, onClose,
   const isFormValid = form.person_name.trim() && form.amount && form.amount > 0 && form.type && form.currency;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-        onClick={onClose}
-      />
-      {/* Modal Container */}
-      <div
-        className="relative bg-white dark:bg-gray-800 rounded-2xl p-8 w-full max-w-[38rem] max-h-[90vh] overflow-y-auto z-50 shadow-2xl transition-all"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {record ? t('lendBorrow.editLendBorrow') : t('lendBorrow.addLendBorrow')}
-            </h2>
+    <>
+      <Loader isLoading={submitting} message="Saving lend/borrow..." />
+      <div className="fixed inset-0 flex items-center justify-center z-50">
+        {/* Overlay */}
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+          onClick={onClose}
+        />
+        {/* Modal Container */}
+        <div
+          className="relative bg-white dark:bg-gray-800 rounded-2xl p-8 w-full max-w-[38rem] max-h-[90vh] overflow-y-auto z-50 shadow-2xl transition-all"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {record ? t('lendBorrow.editLendBorrow') : t('lendBorrow.addLendBorrow')}
+              </h2>
+            </div>
+            <button 
+              onClick={onClose} 
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              aria-label="Close form"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button 
-            onClick={onClose} 
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            aria-label="Close form"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Basic Information */}
-          <div className={fieldRowClass} style={{ marginTop: 0 }}>
-            <div className={fieldColClass}>
-              <CustomDropdown
-                value={form.type}
-                onChange={(value) => handleDropdownChange('type', value)}
-                options={[
-                  { value: 'lend', label: t('lendBorrow.lend') },
-                  { value: 'borrow', label: t('lendBorrow.borrow') },
-                ]}
-                placeholder="Type *"
-                disabled={!!record}
-              />
-              {errors.type && touched.type ? (
-                <p className="mt-1 text-xs text-red-600 flex items-center min-h-[20px]">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Basic Information */}
+            <div className={fieldRowClass} style={{ marginTop: 0 }}>
+              <div className={fieldColClass}>
+                <CustomDropdown
+                  value={form.type}
+                  onChange={(value) => handleDropdownChange('type', value)}
+                  options={[
+                    { value: 'lend', label: t('lendBorrow.lend') },
+                    { value: 'borrow', label: t('lendBorrow.borrow') },
+                  ]}
+                  placeholder="Type *"
+                  disabled={!!record}
+                />
+                {errors.type && touched.type ? (
+                  <p className="mt-1 text-xs text-red-600 flex items-center min-h-[20px]">
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    {errors.type}
+                  </p>
+                ) : (
+                  <div className="min-h-[20px]" />
+                )}
+              </div>
+
+              <div className={fieldColClass + ' relative'}>
+                <input
+                  ref={personNameRef}
+                  name="person_name"
+                  value={form.person_name}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className={getInputClasses('person_name') + ' min-w-[200px] pr-8'}
+                  placeholder="Enter person's name *"
+                  autoComplete="off"
+                  autoFocus={!record}
+                />
+                {form.person_name && (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => handleClear('person_name')}
+                    tabIndex={-1}
+                    aria-label="Clear person name"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                {errors.person_name && touched.person_name ? (
+                  <p className="mt-1 text-xs text-red-600 flex items-center min-h-[20px]">
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    {errors.person_name}
+                  </p>
+                ) : (
+                  <div className="min-h-[20px]" />
+                )}
+              </div>
+            </div>
+
+            <div className={fieldRowClass} style={{ marginTop: 0 }}>
+              <div className={fieldColClass + ' relative'}>
+                <input
+                  name="amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.amount || ''}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className={getInputClasses('amount') + ' min-w-[150px]'}
+                  placeholder="0.00 *"
+                  autoComplete="off"
+                />
+                {errors.amount && touched.amount ? (
+                  <p className="mt-1 text-xs text-red-600 flex items-center min-h-[20px]">
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    {errors.amount}
+                  </p>
+                ) : (
+                  <div className="min-h-[20px]" />
+                )}
+              </div>
+
+              <div className={fieldColClass}>
+                <CustomDropdown
+                  value={form.currency}
+                  onChange={(value) => handleDropdownChange('currency', value)}
+                  options={currencyOptions}
+                  placeholder="Currency *"
+                />
+                {errors.currency && touched.currency ? (
+                  <p className="mt-1 text-xs text-red-600 flex items-center min-h-[20px]">
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    {errors.currency}
+                  </p>
+                ) : (
+                  <div className="min-h-[20px]" />
+                )}
+              </div>
+            </div>
+
+            {/* Due Date */}
+            <div className="w-full" style={{ marginTop: 0 }}>
+              <div className={getInputClasses('due_date') + ' flex items-center bg-gray-100 px-4 pr-[10px] text-[14px] h-10 rounded-lg w-full'}>
+                <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                <DatePicker
+                  selected={form.due_date ? parseISO(form.due_date) : null}
+                  onChange={handleDateChange}
+                  onBlur={() => handleDropdownBlur('due_date')}
+                  placeholderText="Due date"
+                  dateFormat="yyyy-MM-dd"
+                  className="bg-transparent outline-none border-none w-full cursor-pointer text-[14px]"
+                  calendarClassName="z-50 shadow-lg border border-gray-200 rounded-lg !font-sans"
+                  popperPlacement="bottom-start"
+                  showPopperArrow={false}
+                  wrapperClassName="w-full"
+                  todayButton="Today"
+                  highlightDates={[today]}
+                  isClearable
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  className="ml-2 text-xs text-blue-600 hover:underline"
+                  onClick={handleDateToday}
+                  tabIndex={-1}
+                >
+                  Today
+                </button>
+              </div>
+              {errors.due_date && touched.due_date && (
+                <p className="mt-1 text-xs text-red-600 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.type}
+                  {errors.due_date}
                 </p>
-              ) : (
-                <div className="min-h-[20px]" />
               )}
             </div>
 
-            <div className={fieldColClass + ' relative'}>
-              <input
-                ref={personNameRef}
-                name="person_name"
-                value={form.person_name}
+            {/* Notes */}
+            <div className="relative">
+              <textarea
+                ref={notesRef}
+                name="notes"
+                value={form.notes}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                className={getInputClasses('person_name') + ' min-w-[200px] pr-8'}
-                placeholder="Enter person's name *"
-                autoComplete="off"
-                autoFocus={!record}
+                className={getInputClasses('notes') + ' w-full resize-none h-[100px] pr-8'}
+                placeholder="Add any notes, description, or additional details about this transaction"
               />
-              {form.person_name && (
+              {form.notes && (
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  onClick={() => handleClear('person_name')}
+                  className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                  onClick={() => handleClear('notes')}
                   tabIndex={-1}
-                  aria-label="Clear person name"
+                  aria-label="Clear notes"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
-              {errors.person_name && touched.person_name ? (
-                <p className="mt-1 text-xs text-red-600 flex items-center min-h-[20px]">
+              {errors.notes && touched.notes && (
+                <p className="mt-1 text-xs text-red-600 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.person_name}
+                  {errors.notes}
                 </p>
-              ) : (
-                <div className="min-h-[20px]" />
-              )}
-            </div>
-          </div>
-
-          <div className={fieldRowClass} style={{ marginTop: 0 }}>
-            <div className={fieldColClass + ' relative'}>
-              <input
-                name="amount"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.amount || ''}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={getInputClasses('amount') + ' min-w-[150px]'}
-                placeholder="0.00 *"
-                autoComplete="off"
-              />
-              {errors.amount && touched.amount ? (
-                <p className="mt-1 text-xs text-red-600 flex items-center min-h-[20px]">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.amount}
-                </p>
-              ) : (
-                <div className="min-h-[20px]" />
               )}
             </div>
 
-            <div className={fieldColClass}>
-              <CustomDropdown
-                value={form.currency}
-                onChange={(value) => handleDropdownChange('currency', value)}
-                options={currencyOptions}
-                placeholder="Currency *"
-              />
-              {errors.currency && touched.currency ? (
-                <p className="mt-1 text-xs text-red-600 flex items-center min-h-[20px]">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.currency}
-                </p>
-              ) : (
-                <div className="min-h-[20px]" />
-              )}
-            </div>
-          </div>
-
-          {/* Due Date */}
-          <div className="w-full" style={{ marginTop: 0 }}>
-            <div className={getInputClasses('due_date') + ' flex items-center bg-gray-100 px-4 pr-[10px] text-[14px] h-10 rounded-lg w-full'}>
-              <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              <DatePicker
-                selected={form.due_date ? parseISO(form.due_date) : null}
-                onChange={handleDateChange}
-                onBlur={() => handleDropdownBlur('due_date')}
-                placeholderText="Due date"
-                dateFormat="yyyy-MM-dd"
-                className="bg-transparent outline-none border-none w-full cursor-pointer text-[14px]"
-                calendarClassName="z-50 shadow-lg border border-gray-200 rounded-lg !font-sans"
-                popperPlacement="bottom-start"
-                showPopperArrow={false}
-                wrapperClassName="w-full"
-                todayButton="Today"
-                highlightDates={[today]}
-                isClearable
-                autoComplete="off"
-              />
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <button
                 type="button"
-                className="ml-2 text-xs text-blue-600 hover:underline"
-                onClick={handleDateToday}
-                tabIndex={-1}
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={submitting}
               >
-                Today
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[80px]"
+                disabled={submitting || !isFormValid}
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {submitting ? 'Saving...' : (record ? 'Update' : 'Add')}
               </button>
             </div>
-            {errors.due_date && touched.due_date && (
-              <p className="mt-1 text-xs text-red-600 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {errors.due_date}
-              </p>
-            )}
-          </div>
-
-          {/* Notes */}
-          <div className="relative">
-            <textarea
-              ref={notesRef}
-              name="notes"
-              value={form.notes}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              className={getInputClasses('notes') + ' w-full resize-none h-[100px] pr-8'}
-              placeholder="Add any notes, description, or additional details about this transaction"
-            />
-            {form.notes && (
-              <button
-                type="button"
-                className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-                onClick={() => handleClear('notes')}
-                tabIndex={-1}
-                aria-label="Clear notes"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-            {errors.notes && touched.notes && (
-              <p className="mt-1 text-xs text-red-600 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {errors.notes}
-              </p>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              disabled={submitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[80px]"
-              disabled={submitting || !isFormValid}
-            >
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              {submitting ? 'Saving...' : (record ? 'Update' : 'Add')}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }; 

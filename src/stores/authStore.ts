@@ -10,11 +10,14 @@ interface AuthState {
   success: string | null;
   signIn: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ success: boolean; message?: string }>;
+  signInWithProvider: (provider: 'google' | 'apple') => Promise<{ success: boolean; message?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   clearMessages: () => void;
   setUserAndProfile: (user: User | null, profile: any) => void;
   fetchProfile: (userId: string) => Promise<void>;
+  handleEmailConfirmation: () => Promise<void>;
+  checkAuthState: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -37,9 +40,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
-        // For testing: You can temporarily bypass email confirmation errors
-        // by commenting out this error handling and allowing unconfirmed users
         console.error('Sign in error:', error);
+        
+        // Handle email confirmation error
+        if (error.message.includes('Email not confirmed')) {
+          const errorMessage = 'Please check your email and click the verification link before logging in.';
+          set({ error: errorMessage, isLoading: false });
+          return { success: false, message: errorMessage };
+        }
+        
         set({ error: error.message, isLoading: false });
         return { success: false, message: error.message };
       }
@@ -55,22 +64,69 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  signInWithProvider: async (provider: 'google' | 'apple') => {
+    set({ isLoading: true, error: null, success: null });
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Social login error:', error);
+        set({ error: error.message, isLoading: false });
+        return { success: false, message: error.message };
+      }
+
+      console.log('Social login initiated:', data);
+      set({ isLoading: false });
+      return { success: true };
+    } catch (error) {
+      console.error('Social login exception:', error);
+      const errorMessage = (error as Error).message;
+      set({ error: errorMessage, isLoading: false });
+      return { success: false, message: errorMessage };
+    }
+  },
+
   signUp: async (email: string, password: string, fullName?: string) => {
     set({ isLoading: true, error: null, success: null });
     try {
-      // Proceed with registration
+      // Real SaaS registration with proper error handling
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName
-          }
+          },
+          emailRedirectTo: 'https://fin-tech-dq5uuczkm-shalauddin-kaders-projects.vercel.app'
         }
       });
 
       if (error) {
         console.error('Supabase auth error:', error);
+        
+        // Handle specific email rate limit error
+        if (error.message.includes('rate limit') || error.message.includes('too many requests')) {
+          const errorMessage = 'Email service temporarily unavailable. Please set up custom SMTP in Supabase dashboard or try again later. Contact support if this persists.';
+          set({ error: errorMessage, isLoading: false });
+          return { success: false, message: errorMessage };
+        }
+        
+        // Handle email sending errors
+        if (error.message.includes('Error sending confirmation email') || error.message.includes('email')) {
+          const errorMessage = 'Email confirmation failed. This may be due to SMTP configuration issues. Please check your email settings in Supabase dashboard or contact support.';
+          set({ error: errorMessage, isLoading: false });
+          return { success: false, message: errorMessage };
+        }
+        
         set({ error: error.message, isLoading: false });
         return { success: false, message: error.message };
       }
@@ -85,15 +141,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.log('User created successfully:', data.user.id);
       console.log('Profile will be created automatically by database trigger');
 
-      const successMessage = 'Registration successful! Please check your email inbox (and spam folder) to verify your account. You will be able to log in once you confirm your email address.';
-      set({ 
-        user: data.user, 
-        isLoading: false, 
-        success: successMessage,
-        error: null 
-      });
-      
-      return { success: true, message: successMessage };
+      // Check if email confirmation is required
+      if (data.user.email_confirmed_at) {
+        // User is already confirmed (rare but possible)
+        const successMessage = 'Registration successful! You can now log in.';
+        set({ 
+          user: data.user, 
+          isLoading: false, 
+          success: successMessage,
+          error: null 
+        });
+        return { success: true, message: successMessage };
+      } else {
+        // User needs email confirmation
+        const successMessage = 'Registration successful! Please check your email inbox (and spam folder) to verify your account. You will be able to log in once you confirm your email address.';
+        set({ 
+          user: null, // Don't log in automatically
+          isLoading: false, 
+          success: successMessage,
+          error: null 
+        });
+        return { success: true, message: successMessage };
+      }
     } catch (error) {
       console.error('Registration exception:', error);
       const errorMessage = (error as Error).message;
@@ -151,6 +220,56 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       get().fetchProfile(user.id);
     } else {
       set({ profile: null });
+    }
+  },
+
+  // Handle email confirmation redirect
+  handleEmailConfirmation: async () => {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error('Error getting user after email confirmation:', error);
+        return;
+      }
+      
+      if (user && user.email_confirmed_at) {
+        console.log('User email confirmed, setting user state');
+        set({ 
+          user, 
+          isLoading: false, 
+          success: 'Email confirmed successfully! You are now logged in.',
+          error: null 
+        });
+      }
+    } catch (error) {
+      console.error('Error handling email confirmation:', error);
+    }
+  },
+
+  // Check authentication state on app load
+  checkAuthState: async () => {
+    try {
+      set({ isLoading: true });
+      
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error('Error checking auth state:', error);
+        set({ user: null, isLoading: false });
+        return;
+      }
+      
+      if (user) {
+        console.log('User authenticated:', user.id);
+        set({ user, isLoading: false });
+      } else {
+        console.log('No user authenticated');
+        set({ user: null, isLoading: false });
+      }
+    } catch (error) {
+      console.error('Error checking auth state:', error);
+      set({ user: null, isLoading: false });
     }
   }
 })); 

@@ -1,7 +1,12 @@
-const { createClient } = require('@supabase/supabase-js');
-const nodemailer = require('nodemailer');
-const fs = require('fs');
-const path = require('path');
+import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configuration
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -41,11 +46,62 @@ class LastWishService {
     try {
       this.log('Checking for overdue Last Wish users...');
       
-      const { data: overdueUsers, error } = await supabase
-        .rpc('check_overdue_last_wish');
-
-      if (error) {
-        throw error;
+      // Try the RPC function first
+      let overdueUsers = [];
+      let error = null;
+      
+      try {
+        const { data, error: rpcError } = await supabase
+          .rpc('check_overdue_last_wish');
+        
+        if (rpcError) {
+          throw rpcError;
+        }
+        
+        // Handle both table and JSON return types
+        if (Array.isArray(data)) {
+          overdueUsers = data;
+        } else if (typeof data === 'object' && data !== null) {
+          // If it's a JSON object, it might be a single result
+          overdueUsers = [data];
+        } else if (Array.isArray(data)) {
+          overdueUsers = data;
+        } else {
+          this.log('Unexpected data format from RPC function');
+          overdueUsers = [];
+        }
+      } catch (rpcError) {
+        this.log(`RPC function failed, trying direct query: ${rpcError.message}`);
+        
+        // Fallback to direct query
+        const { data: directData, error: directError } = await supabase
+          .from('last_wish_settings')
+          .select(`
+            user_id,
+            check_in_frequency,
+            last_check_in
+          `)
+          .eq('is_enabled', true)
+          .eq('is_active', true)
+          .not('last_check_in', 'is', null);
+        
+        if (directError) {
+          throw directError;
+        }
+        
+        // Calculate overdue users manually
+        overdueUsers = directData
+          .filter(record => {
+            const lastCheckIn = new Date(record.last_check_in);
+            const nextCheckIn = new Date(lastCheckIn.getTime() + (record.check_in_frequency * 24 * 60 * 60 * 1000));
+            const now = new Date();
+            return now > nextCheckIn;
+          })
+          .map(record => ({
+            user_id: record.user_id,
+            email: 'unknown@example.com', // We'll need to get email separately if needed
+            days_overdue: Math.floor((new Date() - new Date(record.last_check_in + (record.check_in_frequency * 24 * 60 * 60 * 1000))) / (1000 * 60 * 60 * 24))
+          }));
       }
 
       this.log(`Found ${overdueUsers.length} overdue users`);
@@ -292,9 +348,9 @@ class LastWishService {
 }
 
 // Run the service
-if (require.main === module) {
+if (import.meta.url === path.toFileURL(process.argv[1]).href) {
   const service = new LastWishService();
   service.run();
 }
 
-module.exports = LastWishService; 
+export default LastWishService; 

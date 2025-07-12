@@ -11,6 +11,8 @@ import { useAuthStore } from '../../store/authStore';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { getCurrencySymbol } from '../../utils/currency';
+import { Loader } from '../../components/common/Loader';
+import { useLoadingContext } from '../../context/LoadingContext';
 
 interface PurchaseFormProps {
   record?: Purchase;
@@ -30,6 +32,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
     addTransaction 
   } = useFinanceStore();
   const { user } = useAuthStore();
+  const { wrapAsync, setLoadingMessage, loadingMessage } = useLoadingContext();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -57,7 +60,9 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
 
   // Autofocus on first field when modal opens
   useEffect(() => {
+    console.log('PurchaseForm: useEffect triggered, isOpen =', isOpen);
     if (isOpen) {
+      console.log('PurchaseForm: Form is opening, editingPurchase =', editingPurchase);
       setTimeout(() => itemNameRef.current?.focus(), 100);
     }
   }, [isOpen]);
@@ -135,269 +140,275 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormSubmitted(true);
-    const newTouched = { item_name: true, category: true, status: true, price: true, account: true, purchase_date: true };
-    setTouched(newTouched);
-    
-    if (!validateForm()) {
-      return;
-    }
-    
-    await handleSubmit(e);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
     if (submitting) return;
     
-    if (!formData.item_name || !formData.category || !formData.purchase_date) {
-      alert('Please fill all required fields.');
+    console.log('PurchaseForm: handleFormSubmit called, submitting:', submitting);
+    console.log('PurchaseForm: editingPurchase =', editingPurchase);
+    
+    console.log('PurchaseForm: Form validation result:', validateForm());
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
       return;
     }
     
-    if (formData.status !== 'planned' && (!formData.price || !selectedAccountId)) {
-      alert('Please fill all required fields (Account and Price are required for non-planned purchases).');
-      return;
-    }
+    console.log('PurchaseForm: calling handleSubmit');
+    await handleSubmit();
+  };
+
+  const handleSubmit = async () => {
+    if (submitting) return;
     
+    console.log('PurchaseForm: handleSubmit called, submitting:', submitting);
+    
+    // Set submitting state immediately to show loading
+    console.log('PurchaseForm: Setting submitting to true');
     setSubmitting(true);
+    setLoadingMessage(editingPurchase ? 'Updating purchase...' : 'Saving purchase...');
+    console.log('PurchaseForm: Loading message set to:', editingPurchase ? 'Updating purchase...' : 'Saving purchase...');
     
     try {
-      if (editingPurchase) {
-        // Handle updating existing purchase
-        const updateData: Partial<Purchase> = {
-          item_name: formData.item_name,
-          category: formData.category,
-          purchase_date: formData.purchase_date,
-          status: (formData.status || 'planned') as 'planned' | 'purchased' | 'cancelled',
-          priority: formData.priority,
-          notes: formData.notes || '',
-          currency: formData.currency,
-          exclude_from_calculation: excludeFromCalculation
-        };
+        if (editingPurchase) {
+          // Handle updating existing purchase
+          const updateData: Partial<Purchase> = {
+            item_name: formData.item_name,
+            category: formData.category,
+            purchase_date: formData.purchase_date,
+            status: (formData.status || 'planned') as 'planned' | 'purchased' | 'cancelled',
+            priority: formData.priority,
+            notes: formData.notes || '',
+            currency: formData.currency,
+            exclude_from_calculation: excludeFromCalculation
+          };
 
-        if (formData.status !== 'planned') {
-          updateData.price = parseFloat(formData.price);
-        } else {
-          updateData.price = 0;
-        }
+          if (formData.status !== 'planned') {
+            updateData.price = parseFloat(formData.price);
+          } else {
+            updateData.price = 0;
+          }
 
-        await updatePurchase(editingPurchase.id, updateData);
+          await updatePurchase(editingPurchase.id, updateData);
 
-        // Handle attachments for editing
-        if (purchaseAttachments.length > 0) {
-          for (const att of purchaseAttachments) {
-            if (!att.id.startsWith('temp_')) continue;
-            
-            if (att.file && (att.file_path.startsWith('blob:') || att.id.startsWith('temp_'))) {
-              const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('attachments')
-                .upload(`purchases/${editingPurchase.id}/${att.file_name}`, att.file, { upsert: true });
+          // Handle attachments for editing
+          if (purchaseAttachments.length > 0) {
+            for (const att of purchaseAttachments) {
+              if (!att.id.startsWith('temp_')) continue;
               
-              if (uploadError) {
-                console.error('Upload error:', uploadError);
-                continue;
-              }
-              
-              if (!uploadError && uploadData && uploadData.path) {
-                const { publicUrl } = supabase.storage.from('attachments').getPublicUrl(uploadData.path).data;
-                const attachmentData = {
-                  purchase_id: editingPurchase.id,
-                  user_id: user?.id || '',
-                  file_name: att.file_name,
-                  file_path: publicUrl,
-                  file_size: att.file_size,
-                  file_type: att.file_type,
-                  mime_type: att.mime_type,
-                  created_at: new Date().toISOString(),
-                };
-                const { error: insertError } = await supabase.from('purchase_attachments').insert(attachmentData);
-                if (insertError) {
-                  console.error('Attachment insert error:', insertError);
+              if (att.file && (att.file_path.startsWith('blob:') || att.id.startsWith('temp_'))) {
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                  .from('attachments')
+                  .upload(`purchases/${editingPurchase.id}/${att.file_name}`, att.file, { upsert: true });
+                
+                if (uploadError) {
+                  console.error('Upload error:', uploadError);
+                  continue;
+                }
+                
+                if (!uploadError && uploadData && uploadData.path) {
+                  const { publicUrl } = supabase.storage.from('attachments').getPublicUrl(uploadData.path).data;
+                  const attachmentData = {
+                    purchase_id: editingPurchase.id,
+                    user_id: user?.id || '',
+                    file_name: att.file_name,
+                    file_path: publicUrl,
+                    file_size: att.file_size,
+                    file_type: att.file_type,
+                    mime_type: att.mime_type,
+                    created_at: new Date().toISOString(),
+                  };
+                  const { error: insertError } = await supabase.from('purchase_attachments').insert(attachmentData);
+                  if (insertError) {
+                    console.error('Attachment insert error:', insertError);
+                  }
                 }
               }
             }
           }
-        }
 
-        // If changing from planned to purchased, create a transaction
-        if (editingPurchase.status === 'planned' && formData.status === 'purchased') {
-          const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-          if (selectedAccount) {
-            const transactionData = {
-              account_id: selectedAccountId,
-              amount: parseFloat(formData.price),
-              type: 'expense' as 'expense',
-              category: formData.category,
-              description: formData.item_name,
-              date: formData.purchase_date,
-              tags: ['purchase'],
-              user_id: user?.id || '',
-            };
-            
-            const transactionId = await addTransaction(transactionData, undefined);
+          // If changing from planned to purchased, create a transaction
+          if (editingPurchase.status === 'planned' && formData.status === 'purchased') {
+            const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+            if (selectedAccount) {
+              const transactionData = {
+                account_id: selectedAccountId,
+                amount: parseFloat(formData.price),
+                type: 'expense' as 'expense',
+                category: formData.category,
+                description: formData.item_name,
+                date: formData.purchase_date,
+                tags: ['purchase'],
+                user_id: user?.id || '',
+              };
+              
+              const transactionId = await addTransaction(transactionData, undefined);
 
-            if (transactionId) {
-              await supabase
-                .from('purchases')
-                .update({ transaction_id: transactionId })
-                .eq('id', editingPurchase.id);
+              if (transactionId) {
+                await supabase
+                  .from('purchases')
+                  .update({ transaction_id: transactionId })
+                  .eq('id', editingPurchase.id);
+              }
             }
           }
-        }
 
-        setEditingPurchase(null);
-        await fetchPurchases();
-        await fetchAccounts();
+          setEditingPurchase(null);
+          await fetchPurchases();
+          await fetchAccounts();
 
-        if (excludeFromCalculation) {
-          toast.success('Purchase updated successfully (excluded from calculation)!');
-        } else {
-          toast.success('Purchase updated successfully!');
-        }
-      } else {
-        // Handle creating new purchase
-        if (formData.status === 'planned') {
-          const purchaseData = {
-            item_name: formData.item_name,
-            category: formData.category,
-            price: 0,
-            purchase_date: formData.purchase_date,
-            status: 'planned' as const,
-            priority: formData.priority,
-            notes: formData.notes || '',
-            currency: 'USD'
-          };
-          
-          await addPurchase(purchaseData);
-        } else {
           if (excludeFromCalculation) {
-            const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+            toast.success('Purchase updated successfully (excluded from calculation)!');
+          } else {
+            toast.success('Purchase updated successfully!');
+          }
+        } else {
+          // Handle creating new purchase
+          if (formData.status === 'planned') {
             const purchaseData = {
               item_name: formData.item_name,
               category: formData.category,
-              price: parseFloat(formData.price),
+              price: 0,
               purchase_date: formData.purchase_date,
-              status: 'purchased' as const,
+              status: 'planned' as const,
               priority: formData.priority,
               notes: formData.notes || '',
-              currency: selectedAccount?.currency || formData.currency || 'USD',
-              account_id: selectedAccountId,
-              exclude_from_calculation: true
+              currency: 'USD'
             };
-            const { data: newPurchase, error: purchaseError } = await supabase
-              .from('purchases')
-              .insert(purchaseData)
-              .select()
-              .single();
             
-            if (purchaseError) {
-              console.error('Purchase insert error:', purchaseError);
-              toast.error('Failed to add purchase. Please try again.');
-              return;
-            }
+            await addPurchase(purchaseData);
+            toast.success('Planned purchase added successfully!');
+          } else {
+            if (excludeFromCalculation) {
+              const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+              const purchaseData = {
+                item_name: formData.item_name,
+                category: formData.category,
+                price: parseFloat(formData.price),
+                purchase_date: formData.purchase_date,
+                status: 'purchased' as const,
+                priority: formData.priority,
+                notes: formData.notes || '',
+                currency: selectedAccount?.currency || formData.currency || 'USD',
+                account_id: selectedAccountId,
+                exclude_from_calculation: true
+              };
+              const { data: newPurchase, error: purchaseError } = await supabase
+                .from('purchases')
+                .insert(purchaseData)
+                .select()
+                .single();
+              
+              if (purchaseError) {
+                console.error('Purchase insert error:', purchaseError);
+                toast.error('Failed to add purchase. Please try again.');
+                return;
+              }
 
-            // Handle attachments for new purchase
-            if (purchaseAttachments.length > 0 && newPurchase) {
-              for (const att of purchaseAttachments) {
-                if (att.file && att.file_path.startsWith('blob:')) {
-                  const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('attachments')
-                    .upload(`purchases/${newPurchase.id}/${att.file_name}`, att.file, { upsert: true });
-                  
-                  if (uploadError) {
-                    console.error('Upload error:', uploadError);
-                    continue;
-                  }
-                  
-                  if (!uploadError && uploadData && uploadData.path) {
-                    const { publicUrl } = supabase.storage.from('attachments').getPublicUrl(uploadData.path).data;
-                    const attachmentData = {
-                      purchase_id: newPurchase.id,
-                      user_id: user?.id || '',
-                      file_name: att.file_name,
-                      file_path: publicUrl,
-                      file_size: att.file_size,
-                      file_type: att.file_type,
-                      mime_type: att.mime_type,
-                      created_at: new Date().toISOString(),
-                    };
-                    const { error: insertError } = await supabase.from('purchase_attachments').insert(attachmentData);
-                    if (insertError) {
-                      console.error('Attachment insert error:', insertError);
+              // Handle attachments for new purchase
+              if (purchaseAttachments.length > 0 && newPurchase) {
+                for (const att of purchaseAttachments) {
+                  if (att.file && att.file_path.startsWith('blob:')) {
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                      .from('attachments')
+                      .upload(`purchases/${newPurchase.id}/${att.file_name}`, att.file, { upsert: true });
+                    
+                    if (uploadError) {
+                      console.error('Upload error:', uploadError);
+                      continue;
+                    }
+                    
+                    if (!uploadError && uploadData && uploadData.path) {
+                      const { publicUrl } = supabase.storage.from('attachments').getPublicUrl(uploadData.path).data;
+                      const attachmentData = {
+                        purchase_id: newPurchase.id,
+                        user_id: user?.id || '',
+                        file_name: att.file_name,
+                        file_path: publicUrl,
+                        file_size: att.file_size,
+                        file_type: att.file_type,
+                        mime_type: att.mime_type,
+                        created_at: new Date().toISOString(),
+                      };
+                      const { error: insertError } = await supabase.from('purchase_attachments').insert(attachmentData);
+                      if (insertError) {
+                        console.error('Attachment insert error:', insertError);
+                      }
                     }
                   }
                 }
               }
-            }
 
-            await fetchPurchases();
-            await fetchAccounts();
-            toast.success('Purchase added successfully (excluded from calculation)!');
-          } else {
-            // Normal flow: create transaction and link purchase
-            const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-            if (!selectedAccount) throw new Error('Selected account not found');
-            const transactionData = {
-              account_id: selectedAccountId,
-              amount: parseFloat(formData.price),
-              type: 'expense' as 'expense',
-              category: formData.category,
-              description: formData.item_name,
-              date: formData.purchase_date,
-              tags: ['purchase'],
-              user_id: user?.id || '',
-            };
-            // Add transaction and get transactionId - this will automatically create a purchase record
-            const transactionId = await addTransaction(transactionData, {
-              priority: (formData.status || 'planned') === 'purchased' ? formData.priority : 'medium',
-              notes: formData.notes || '',
-              attachments: purchaseAttachments, // Pass attachments to be handled by addTransaction
-            });
-            if (transactionId) {
-              toast.success('Purchase added successfully!');
+              await fetchPurchases();
+              await fetchAccounts();
+              toast.success('Purchase added successfully (excluded from calculation)!');
+            } else {
+              // Normal flow: create transaction and link purchase
+              const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+              if (!selectedAccount) throw new Error('Selected account not found');
+              const transactionData = {
+                account_id: selectedAccountId,
+                amount: parseFloat(formData.price),
+                type: 'expense' as 'expense',
+                category: formData.category,
+                description: formData.item_name,
+                date: formData.purchase_date,
+                tags: ['purchase'],
+                user_id: user?.id || '',
+              };
+              // Add transaction and get transactionId - this will automatically create a purchase record
+              const transactionId = await addTransaction(transactionData, {
+                priority: (formData.status || 'planned') === 'purchased' ? formData.priority : 'medium',
+                notes: formData.notes || '',
+                attachments: purchaseAttachments, // Pass attachments to be handled by addTransaction
+              });
+              if (transactionId) {
+                toast.success('Purchase added successfully!');
+              }
             }
           }
         }
-      }
 
-      // Reset form
-      setFormData({
-        item_name: '',
-        category: '',
-        price: '',
-        currency: 'USD',
-        purchase_date: new Date().toISOString().split('T')[0],
-        status: '',
-        priority: 'medium',
-        notes: ''
-      });
-      setSelectedAccountId('');
-      setPurchaseAttachments([]);
-      setFieldErrors({});
-      setTouched({});
-      setFormSubmitted(false);
-      setEditingPurchase(null);
-      setExcludeFromCalculation(false);
-      
-      onClose();
-    } catch (error) {
-      console.error('Error submitting purchase:', error);
-      toast.error('Failed to save purchase. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+        // Reset form
+        setFormData({
+          item_name: '',
+          category: '',
+          price: '',
+          currency: 'USD',
+          purchase_date: new Date().toISOString().split('T')[0],
+          status: '',
+          priority: 'medium',
+          notes: ''
+        });
+        setSelectedAccountId('');
+        setPurchaseAttachments([]);
+        setFieldErrors({});
+        setTouched({});
+        setFormSubmitted(false);
+        setEditingPurchase(null);
+        setExcludeFromCalculation(false);
+        
+        // Add a small delay to ensure the loader animation is visible
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        onClose();
+      } catch (error) {
+        console.error('Error submitting purchase:', error);
+        toast.error('Failed to save purchase. Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
   };
 
   // Don't render if not open
+  console.log('PurchaseForm: Rendering, isOpen =', isOpen, 'submitting =', submitting);
   if (!isOpen) return null;
 
   return (
     <>
+      <Loader isLoading={submitting} message={loadingMessage} />
       <div className="fixed inset-0 flex items-center justify-center z-50">
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={() => {
-          onClose();
-          setEditingPurchase(null);
+          if (!submitting) {
+            onClose();
+            setEditingPurchase(null);
+          }
         }} />
         <div className="relative bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-[38rem] max-h-[90vh] overflow-y-auto z-50 shadow-xl transition-all" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-6">
@@ -407,8 +418,9 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
                 onClose();
                 setEditingPurchase(null);
               }}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className={`p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               aria-label="Close form"
+              disabled={submitting}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
@@ -432,6 +444,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
                   className={`w-full px-4 pr-[32px] text-[14px] h-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors bg-gray-100 font-medium ${fieldErrors.item_name && touched.item_name ? 'border-red-500 ring-red-200' : 'border-gray-300'}`}
                   placeholder="Enter item name *"
                   required
+                  disabled={submitting}
                 />
                 {formData.item_name && (
                   <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" onClick={() => handleFormChange('item_name', '')} tabIndex={-1} aria-label="Clear item name">
@@ -461,6 +474,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
                   placeholder="Select category *"
                   fullWidth={true}
                   summaryMode={true}
+                  disabled={submitting}
                 />
                 {fieldErrors.category && touched.category && (
                   <span className="text-xs text-red-600 absolute left-0 -bottom-5 flex items-center gap-1"><AlertCircle className="w-4 h-4" />{fieldErrors.category}</span>
@@ -492,7 +506,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
                     setTouched(t => ({ ...t, status: true }));
                   }}
                   placeholder="Select status *"
-                  disabled={!!(editingPurchase && editingPurchase.status === 'purchased')}
+                  disabled={!!(editingPurchase && editingPurchase.status === 'purchased') || submitting}
                   fullWidth={true}
                   summaryMode={true}
                 />
@@ -518,6 +532,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
                       }}
                       placeholder="Select Account *"
                       fullWidth={true}
+                      disabled={submitting}
                     />
                     {fieldErrors.account && touched.account && (
                       <span className="text-xs text-red-600 absolute left-0 -bottom-5 flex items-center gap-1"><AlertCircle className="w-4 h-4" />{fieldErrors.account}</span>
@@ -539,6 +554,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
                       placeholder="0.00 *"
                       required
                       autoComplete="off"
+                      disabled={submitting}
                     />
                     {formData.price && (
                       <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" onClick={() => handleFormChange('price', '')} tabIndex={-1} aria-label="Clear price">
@@ -578,6 +594,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ record, onClose, isO
                       highlightDates={[new Date()]}
                       isClearable
                       autoComplete="off"
+                      disabled={submitting}
                     />
                     <button
                       type="button"

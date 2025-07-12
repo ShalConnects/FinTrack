@@ -114,24 +114,24 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, title, subtitle })
   };
 
   return (
-    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-4">
+    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-2 sm:px-4 py-3 sm:py-4">
       <div className="flex items-center justify-between">
         <div className="flex flex-col space-y-0.5">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <button
               onClick={onMenuToggle}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="md:hidden p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
-              <Menu className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300" />
             </button>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white" style={{ marginLeft: 0 }}>{title}</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white" style={{ marginLeft: 0 }}>{title}</h1>
           </div>
           {subtitle && (
-            <span className="text-gray-600 text-base mt-0.5">{subtitle}</span>
+            <span className="text-gray-600 text-sm sm:text-base mt-0.5 hidden xs:block">{subtitle}</span>
           )}
         </div>
         
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           {/* Search */}
           <div className="hidden sm:block relative w-80">
             <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 w-full">
@@ -196,21 +196,21 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, title, subtitle })
           </div> */}
           
           {/* Theme Toggle & Notifications */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={toggleTheme}
               className="p-0 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
               title={isDarkMode ? t('switchToLightMode') : t('switchToDarkMode')}
-              style={{ height: 30, width: 30 }}
+              style={{ height: 28, width: 28 }}
             >
               {isDarkMode ? (
-                <Sun className="w-5 h-5 text-gray-500 dark:text-gray-300" />
+                <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-300" />
               ) : (
-                <Moon className="w-5 h-5 text-gray-500 dark:text-gray-300" />
+                <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-300" />
               )}
             </button>
-            <div style={{ height: 30, width: 30 }} className="flex items-center justify-center">
-              <NotificationDropdown iconClassName="w-5 h-5 text-gray-500 dark:text-gray-300" />
+            <div style={{ height: 28, width: 28 }} className="flex items-center justify-center">
+              <NotificationDropdown iconClassName="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-300" />
             </div>
           </div>
           
@@ -219,16 +219,16 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, title, subtitle })
             <button
               ref={profileBtnRef}
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="relative flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="relative flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               {profile?.profilePicture ? (
                 <img
                   src={supabase.storage.from('avatars').getPublicUrl(profile.profilePicture + '?t=' + Date.now()).data.publicUrl}
                   alt={profile.fullName}
-                  className="w-10 h-10 rounded-full object-cover"
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover"
                 />
               ) : (
-                <span className="text-lg font-bold">
+                <span className="text-sm sm:text-lg font-bold">
                   {profile?.fullName
                     ? profile.fullName.trim().split(' ').map((n: string, i: number, arr: string[]) => i === 0 || i === arr.length - 1 ? n[0].toUpperCase() : '').join('')
                     : 'U'}
@@ -237,7 +237,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, title, subtitle })
             </button>
 
             {showUserMenu && (
-              <div ref={userMenuRef} className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-2 z-50 border border-gray-200 dark:border-gray-700">
+              <div ref={userMenuRef} className="absolute right-0 mt-2 w-40 sm:w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-2 z-50 border border-gray-200 dark:border-gray-700">
                 <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">{profile?.fullName}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Home, 
   CreditCard, 
@@ -44,6 +44,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
   const [dropdownPos, setDropdownPos] = useState<{top: number, left: number, direction: 'down' | 'up'} | null>(null);
   const navigate = useNavigate();
   const { isSidebarCollapsed, toggleSidebar } = useThemeStore();
+  
+  // Check if screen is mobile/tablet (≤767px)
+  const [isMobile, setIsMobile] = useState(false);
+  const [isVerySmall, setIsVerySmall] = useState(false);
+  
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      setIsMobile(width <= 767);
+      setIsVerySmall(width <= 468);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+  
+  // Force collapse on mobile
+  const effectiveCollapsed = isMobile || isSidebarCollapsed;
 
   // Helper to get initials
   const getInitials = (name?: string) => {
@@ -107,14 +127,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
         fixed left-0 top-0 h-screen bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-30 transform transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
         md:translate-x-0 md:static md:z-0
-        ${isSidebarCollapsed ? 'w-16' : 'w-52'}
+        ${effectiveCollapsed ? 'w-16' : 'w-52'}
       `}>
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className={`flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 ${
-            isSidebarCollapsed ? 'px-2' : 'px-6'
+            effectiveCollapsed ? 'px-2' : 'px-6'
           }`}>
-            {!isSidebarCollapsed && (
+            {!effectiveCollapsed && (
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
                   <TrendingUp className="w-5 h-5 text-white" />
@@ -122,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
                 <span className="text-xl font-bold text-gray-900 dark:text-white">FinanceFlow</span>
               </div>
             )}
-            {isSidebarCollapsed && (
+            {effectiveCollapsed && (
               <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center mx-auto">
                 <TrendingUp className="w-5 h-5 text-white" />
               </div>
@@ -137,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
           
           {/* Navigation */}
           <nav className={`flex-1 p-4 space-y-2 ${
-            isSidebarCollapsed ? 'px-2' : 'px-4'
+            effectiveCollapsed ? 'px-2' : 'px-4'
           }`}>
             {navigation.map((item) => {
               const Icon = item.icon;
@@ -153,22 +173,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
                     }}
                     className={`
                       w-full flex items-center space-x-3 rounded-lg transition-all duration-200
-                      ${isSidebarCollapsed ? 'px-2 py-3 justify-center' : 'px-4 py-3'}
+                      ${effectiveCollapsed ? 'px-2 py-3 justify-center' : 'px-4 py-3'}
                       ${isActive 
                         ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-blue-500 dark:border-blue-400 text-gradient-primary font-semibold' 
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gradient-to-r hover:from-gray-50 hover:via-blue-50/30 hover:to-gray-50 dark:hover:from-gray-700/50 dark:hover:via-blue-900/10 dark:hover:to-gray-700/50 hover:text-gray-900 dark:hover:text-white'
                       }
                     `}
-                    title={isSidebarCollapsed ? t(item.name) : undefined}
+                    title={effectiveCollapsed ? t(item.name) : undefined}
                   >
                     <Icon className={`w-5 h-5 ${isActive ? 'text-gradient-primary' : 'text-gray-400 dark:text-gray-500'}`} />
-                    {!isSidebarCollapsed && (
+                    {!effectiveCollapsed && (
                       <span className="text-[14px] font-bold">{t(item.name)}</span>
                     )}
                   </button>
                   
                   {/* Subcategories for Analytics */}
-                  {item.id === 'analytics' && isAnalyticsActive && !isSidebarCollapsed && (
+                  {item.id === 'analytics' && isAnalyticsActive && !effectiveCollapsed && (
                     <div className="ml-6 mt-2 space-y-1">
                       <button
                         onClick={() => {
@@ -211,36 +231,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
           
           {/* User section */}
           <div className={`p-4 border-t border-gray-200 dark:border-gray-700 ${
-            isSidebarCollapsed ? 'px-2' : 'px-4'
+            effectiveCollapsed ? 'px-2' : 'px-4'
           }`}>
             <div className="flex items-center space-x-2">
               <Link
                 to="/dashboard/help"
                 className={`flex-1 flex items-center space-x-3 px-3 py-2 mt-2 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
-                  isSidebarCollapsed ? 'justify-center px-2' : ''
+                  effectiveCollapsed ? 'justify-center px-2' : ''
                 }`}
-                title={isSidebarCollapsed ? 'Help & Support' : undefined}
+                title={effectiveCollapsed ? 'Help & Support' : undefined}
               >
                 <HelpCircle className="w-4 h-4" />
-                {!isSidebarCollapsed && (
+                {!effectiveCollapsed && (
                   <span className="text-[13px]">Help & Support</span>
                 )}
               </Link>
-              <button 
-                onClick={toggleSidebar}
-                className={`rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mt-2 ${
-                  isSidebarCollapsed 
-                    ? 'p-2 bg-gradient-to-r from-blue-50 via-purple-50 to-blue-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-blue-900/20 hover:from-blue-100 hover:via-purple-100 hover:to-blue-100 dark:hover:from-blue-800/30 dark:hover:via-purple-800/30 dark:hover:to-blue-800/30 shadow-sm' 
-                    : 'p-1'
-                }`}
-                title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                {isSidebarCollapsed ? (
-                  <ChevronsRight className="w-5 h-5 text-gradient-primary" />
-                ) : (
-                  <ChevronsLeft className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                )}
-              </button>
+              {/* Only show toggle button on desktop (>767px) */}
+              {!isMobile && (
+                <button 
+                  onClick={toggleSidebar}
+                  className={`rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mt-2 ${
+                    effectiveCollapsed 
+                      ? 'p-2 bg-gradient-to-r from-blue-50 via-purple-50 to-blue-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-blue-900/20 hover:from-blue-100 hover:via-purple-100 hover:to-blue-100 dark:hover:from-blue-800/30 dark:hover:via-purple-800/30 dark:hover:to-blue-800/30 shadow-sm' 
+                      : 'p-1'
+                  }`}
+                  title={effectiveCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                  {effectiveCollapsed ? (
+                    <ChevronsRight className="w-5 h-5 text-gradient-primary" />
+                  ) : (
+                    <ChevronsLeft className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

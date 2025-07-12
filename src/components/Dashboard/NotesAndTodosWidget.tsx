@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
-import { Star, StickyNote as StickyNoteIcon, Plus } from 'lucide-react';
+import { Star, StickyNote as StickyNoteIcon, Plus, AlertTriangle } from 'lucide-react';
 import { CustomDropdown } from '../Purchases/CustomDropdown';
 import Modal from 'react-modal';
 
@@ -41,6 +41,7 @@ export const NotesAndTodosWidget: React.FC = () => {
   const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null);
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [showAllTasks, setShowAllTasks] = useState(false);
+  const [lastWishCountdown, setLastWishCountdown] = useState<null | { daysLeft: number, nextCheckIn: string }>(null);
 
   // Fetch notes from Supabase
   useEffect(() => {
@@ -216,6 +217,28 @@ export const NotesAndTodosWidget: React.FC = () => {
     }
   };
 
+  // Fetch Last Wish countdown
+  useEffect(() => {
+    if (!user) return;
+    const fetchLastWish = async () => {
+      const { data, error } = await supabase
+        .from('last_wish_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      if (!error && data && data.is_enabled && data.last_check_in && data.check_in_frequency) {
+        const lastCheckIn = new Date(data.last_check_in);
+        const nextCheckIn = new Date(lastCheckIn.getTime() + data.check_in_frequency * 24 * 60 * 60 * 1000);
+        const now = new Date();
+        const daysLeft = Math.max(0, Math.ceil((nextCheckIn.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        setLastWishCountdown({ daysLeft, nextCheckIn: nextCheckIn.toLocaleDateString() });
+      } else {
+        setLastWishCountdown(null);
+      }
+    };
+    fetchLastWish();
+  }, [user]);
+
   // In the notes tab, only show first 3 notes, and a 'View All Notes' link if more
   const notesToShow = notes.slice(0, 3);
   // In the tasks tab, only show first 3 tasks, and a 'View All Tasks' link if more
@@ -223,6 +246,16 @@ export const NotesAndTodosWidget: React.FC = () => {
 
   return (
     <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-blue-900/40 dark:via-purple-900/40 dark:to-blue-900/40 rounded-xl p-4 mb-4 shadow-sm flex flex-col transition-all duration-300">
+      {/* Last Wish Countdown Widget */}
+      {lastWishCountdown && (
+        <div className="mb-4 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-purple-500" />
+          <div>
+            <div className="text-sm font-semibold text-purple-800 dark:text-purple-200">Last Wish Check-in</div>
+            <div className="text-xs text-purple-700 dark:text-purple-300">{lastWishCountdown.daysLeft} days left (next: {lastWishCountdown.nextCheckIn})</div>
+          </div>
+        </div>
+      )}
       {/* Tabs */}
       <div className="flex mb-4 border-b border-gray-200 dark:border-gray-700">
         <button

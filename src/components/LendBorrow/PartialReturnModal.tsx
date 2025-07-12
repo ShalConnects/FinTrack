@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { X, AlertCircle, DollarSign, Calendar, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, AlertCircle, DollarSign, Calendar, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { LendBorrow, LendBorrowReturn } from '../../types/index';
 import { toast } from 'sonner';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { Loader } from '../common/Loader';
 
 interface PartialReturnModalProps {
   isOpen: boolean;
@@ -83,6 +84,9 @@ export const PartialReturnModal: React.FC<PartialReturnModalProps> = ({
     setLoading(true);
     setError('');
     try {
+      // Add a small delay to ensure loading animation is visible
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Insert into the returns table
       const { data: returnData, error: returnError } = await supabase
         .from('lend_borrow_returns')
@@ -121,6 +125,8 @@ export const PartialReturnModal: React.FC<PartialReturnModalProps> = ({
         updated_at: new Date().toISOString(),
       };
       onUpdated(updatedRecord);
+      // Add a small delay before closing to show success state
+      await new Promise(resolve => setTimeout(resolve, 300));
       onClose();
       setLoading(false);
       setAmount(0);
@@ -152,8 +158,10 @@ export const PartialReturnModal: React.FC<PartialReturnModalProps> = ({
   const today = new Date();
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+    <>
+      <Loader isLoading={loading} message="Recording partial return..." />
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Record Partial Return</h2>
           <button
@@ -275,12 +283,12 @@ export const PartialReturnModal: React.FC<PartialReturnModalProps> = ({
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[80px]"
               disabled={loading || !!validate()}
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               {loading ? 'Saving...' : 'Add Return'}
             </button>
           </div>
         </form>
       </div>
     </div>
+    </>
   );
 }; 

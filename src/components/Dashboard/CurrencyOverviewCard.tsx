@@ -256,31 +256,35 @@ export const CurrencyOverviewCard: React.FC<CurrencyOverviewCardProps> = ({
           dropdownMenuClassName="!bg-[#d3d3d3bf] !top-[20px]"
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard
-          title={<span className="text-[13px]">{t('dashboard.monthlyIncome')}</span>}
-          value={<span className="text-[16px] font-bold text-green-600">{formatCurrency(filteredIncome, currency)}</span>}
-          trend="up"
-          color="green"
-          insight={renderInsight(incomeChange, compareLabel)}
-          trendGraph={
-            <LineChart width={60} height={24} data={sparkData} margin={{ top: 6, right: 0, left: 0, bottom: 0 }}>
-              <Line type="monotone" dataKey="income" stroke={incomeColor} strokeWidth={2} dot={false} isAnimationActive={false} />
-            </LineChart>
-          }
-        />
-        <StatCard
-          title={<span className="text-[13px]">{t('dashboard.monthlyExpenses')}</span>}
-          value={<span className="text-[16px] font-bold text-red-600">{formatCurrency(filteredExpenses, currency)}</span>}
-          trend="down"
-          color="red"
-          insight={renderInsight(expensesChange, compareLabel, true)}
-          trendGraph={
-            <LineChart width={60} height={24} data={sparkData} margin={{ top: 6, right: 0, left: 0, bottom: 0 }}>
-              <Line type="monotone" dataKey="expense" stroke={expenseColor} strokeWidth={2} dot={false} isAnimationActive={false} />
-            </LineChart>
-          }
-        />
+      <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+        <div className="w-full">
+          <StatCard
+            title={<span className="text-[13px]">{t('dashboard.monthlyIncome')}</span>}
+            value={<span className="text-[16px] font-bold text-green-600">{formatCurrency(filteredIncome, currency)}</span>}
+            trend="up"
+            color="green"
+            insight={renderInsight(incomeChange, compareLabel)}
+            trendGraph={
+              <LineChart width={60} height={24} data={sparkData} margin={{ top: 6, right: 0, left: 0, bottom: 0 }}>
+                <Line type="monotone" dataKey="income" stroke={incomeColor} strokeWidth={2} dot={false} isAnimationActive={false} />
+              </LineChart>
+            }
+          />
+        </div>
+        <div className="w-full">
+          <StatCard
+            title={<span className="text-[13px]">{t('dashboard.monthlyExpenses')}</span>}
+            value={<span className="text-[16px] font-bold text-red-600">{formatCurrency(filteredExpenses, currency)}</span>}
+            trend="down"
+            color="red"
+            insight={renderInsight(expensesChange, compareLabel, true)}
+            trendGraph={
+              <LineChart width={60} height={24} data={sparkData} margin={{ top: 6, right: 0, left: 0, bottom: 0 }}>
+                <Line type="monotone" dataKey="expense" stroke={expenseColor} strokeWidth={2} dot={false} isAnimationActive={false} />
+              </LineChart>
+            }
+          />
+        </div>
       </div>
     </div>
   );

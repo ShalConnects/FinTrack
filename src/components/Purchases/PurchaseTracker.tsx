@@ -37,6 +37,8 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { CustomDropdown } from './CustomDropdown';
 import { toast } from 'sonner';
 import { useSearchParams } from 'react-router-dom';
+import { useLoadingContext } from '../../context/LoadingContext';
+import { Loader } from '../common/Loader';
 
 import { useNotificationsStore } from '../../stores/notificationsStore';
 import { DeleteConfirmationModal } from '../common/DeleteConfirmationModal';
@@ -85,6 +87,7 @@ export const PurchaseTracker: React.FC = () => {
   const { user, profile } = useAuthStore();
   const { t } = useTranslation();
   const { fetchNotifications } = useNotificationsStore();
+  const { wrapAsync, setLoadingMessage, loadingMessage } = useLoadingContext();
   const [formSubmitted, setFormSubmitted] = useState(false);
   const { showPurchaseForm, setShowPurchaseForm } = useFinanceStore();
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
@@ -332,21 +335,31 @@ export const PurchaseTracker: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('PurchaseTracker: handleSubmit called, submitting =', submitting);
     if (submitting) return; // Prevent double submission
+    
+    console.log('PurchaseTracker: Form data for validation:', formData);
+    console.log('PurchaseTracker: Selected account ID:', selectedAccountId);
+    console.log('PurchaseTracker: Editing purchase:', editingPurchase);
     
     // Basic validation for all purchases
     if (!formData.item_name || !formData.category || !formData.purchase_date) {
+      console.log('PurchaseTracker: Basic validation failed');
       alert('Please fill all required fields.');
       return;
     }
     
     // Additional validation for non-planned purchases
     if (formData.status !== 'planned' && (!formData.price || !selectedAccountId)) {
+      console.log('PurchaseTracker: Additional validation failed - status:', formData.status, 'price:', formData.price, 'accountId:', selectedAccountId);
       alert('Please fill all required fields (Account and Price are required for non-planned purchases).');
       return;
     }
     
+    console.log('PurchaseTracker: All validation passed, proceeding with submission');
+    
     setSubmitting(true);
+    setLoadingMessage(editingPurchase ? 'Updating purchase...' : 'Saving purchase...');
     
     try {
       if (editingPurchase) {
@@ -487,6 +500,7 @@ export const PurchaseTracker: React.FC = () => {
           };
           
           await addPurchase(purchaseData);
+          toast.success('Planned purchase added successfully!');
         } else {
           // For purchased/cancelled items, handle excludeFromCalculation
           if (excludeFromCalculation) {
@@ -593,10 +607,13 @@ export const PurchaseTracker: React.FC = () => {
       priority: 'medium',
       notes: ''
     });
-      setSelectedAccountId('');
-      setPurchaseAttachments([]);
-          setShowPurchaseForm(false);
-    setExcludeFromCalculation(false);
+          setSelectedAccountId('');
+    setPurchaseAttachments([]);
+    
+    // Add a small delay to ensure the loader animation is visible
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setShowPurchaseForm(false);
+  setExcludeFromCalculation(false);
     } catch (error) {
       console.error('Error submitting purchase:', error);
       if (editingPurchase) {
@@ -617,30 +634,46 @@ export const PurchaseTracker: React.FC = () => {
       if (!window.confirm(`Are you sure you want to delete ${selectedPurchases.length} purchase(s)?`)) {
         return;
       }
-      let allSucceeded = true;
-      for (const id of selectedPurchases) {
-        try {
-          const purchase = purchases.find(p => p.id === id);
-          if (purchase && purchase.transaction_id) {
-            const linkedTransaction = transactions.find(t => t.transaction_id === purchase.transaction_id);
-            if (linkedTransaction) {
-              await deleteTransaction(linkedTransaction.id);
+      
+      // Wrap the bulk delete process with loading state
+      const wrappedBulkDelete = wrapAsync(async () => {
+        setLoadingMessage('Deleting purchases...');
+        let allSucceeded = true;
+        for (const id of selectedPurchases) {
+          try {
+            const purchase = purchases.find(p => p.id === id);
+            if (purchase && purchase.transaction_id) {
+              const linkedTransaction = transactions.find(t => t.transaction_id === purchase.transaction_id);
+              if (linkedTransaction) {
+                await deleteTransaction(linkedTransaction.id);
+              }
             }
+            await deletePurchase(id);
+          } catch (err) {
+            allSucceeded = false;
           }
-          await deletePurchase(id);
-        } catch (err) {
-          allSucceeded = false;
         }
-      }
-      if (allSucceeded) {
-        toast.success('Selected purchases deleted successfully!');
-      } else {
-        toast.error('Failed to delete some purchases. Please try again.');
-      }
+        if (allSucceeded) {
+          toast.success('Selected purchases deleted successfully!');
+        } else {
+          toast.error('Failed to delete some purchases. Please try again.');
+        }
+      });
+      
+      // Execute the wrapped bulk delete function
+      await wrappedBulkDelete();
     } else {
       const status = action === 'mark_purchased' ? 'purchased' : 'cancelled';
-      await bulkUpdatePurchases(selectedPurchases, { status });
-      toast.success('Selected purchases updated successfully!');
+      
+      // Wrap the bulk update process with loading state
+      const wrappedBulkUpdate = wrapAsync(async () => {
+        setLoadingMessage('Updating purchases...');
+        await bulkUpdatePurchases(selectedPurchases, { status });
+        toast.success('Selected purchases updated successfully!');
+      });
+      
+      // Execute the wrapped bulk update function
+      await wrappedBulkUpdate();
     }
     setSelectedPurchases([]);
   };
@@ -1460,15 +1493,18 @@ export const PurchaseTracker: React.FC = () => {
       </div>
 
       {/* Purchase Form Modal */}
-      {showPurchaseForm && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
+                      {showPurchaseForm && (
+          console.log('PurchaseTracker: Rendering purchase form, editingPurchase =', editingPurchase),
+          <>
+            <Loader isLoading={submitting} message={loadingMessage} />
+            <div className="fixed inset-0 flex items-center justify-center z-50">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={() => {
             setShowPurchaseForm(false);
             setEditingPurchase(null);
           }} />
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-[38rem] max-h-[90vh] overflow-y-auto z-50 shadow-xl transition-all" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{editingPurchase ? 'Edit Purchase' : 'Add Purchase'}</h2>
+                      <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{editingPurchase ? 'Edit Purchase' : 'Add Purchase'}</h2>
               <button
                 onClick={() => {
                   setShowPurchaseForm(false);
@@ -1703,6 +1739,7 @@ export const PurchaseTracker: React.FC = () => {
             </form>
           </div>
         </div>
+        </>
       )}
 
       {/* Notes Modal */}
@@ -1775,23 +1812,30 @@ export const PurchaseTracker: React.FC = () => {
         isOpen={showDeleteModal && !!purchaseToDelete}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={async () => {
-                  setShowDeleteModal(false);
-                  if (purchaseToDelete) {
-                    try {
-                      if (purchaseToDelete.transaction_id) {
-                        const linkedTransaction = transactions.find(t => t.transaction_id === purchaseToDelete.transaction_id);
-                        if (linkedTransaction) {
-                          await deleteTransaction(linkedTransaction.id);
-                        }
-                      }
-                      await deletePurchase(purchaseToDelete.id);
-                      toast.success('Purchase deleted successfully!');
-                    } catch (err) {
-                      toast.error('Failed to delete purchase. Please try again.');
-                    }
-                    setPurchaseToDelete(null);
+          setShowDeleteModal(false);
+          if (purchaseToDelete) {
+            // Wrap the single delete process with loading state
+            const wrappedDelete = wrapAsync(async () => {
+              setLoadingMessage('Deleting purchase...');
+              try {
+                if (purchaseToDelete.transaction_id) {
+                  const linkedTransaction = transactions.find(t => t.transaction_id === purchaseToDelete.transaction_id);
+                  if (linkedTransaction) {
+                    await deleteTransaction(linkedTransaction.id);
                   }
-                }}
+                }
+                await deletePurchase(purchaseToDelete.id);
+                toast.success('Purchase deleted successfully!');
+              } catch (err) {
+                toast.error('Failed to delete purchase. Please try again.');
+              }
+              setPurchaseToDelete(null);
+            });
+            
+            // Execute the wrapped delete function
+            await wrappedDelete();
+          }
+        }}
         title="Delete Purchase"
         message={`Are you sure you want to delete ${purchaseToDelete?.item_name}? This will also remove the linked transaction and update the account balance.`}
         recordDetails={

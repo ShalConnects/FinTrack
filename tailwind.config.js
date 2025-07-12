@@ -7,6 +7,9 @@ export default {
       fontFamily: {
         sans: ['Manrope', 'sans-serif'],
       },
+      screens: {
+        'xs': '468px',
+      },
     },
   },
   plugins: [],

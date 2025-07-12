@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { Account } from '../../types';
-import { contextToasts } from '../../lib/toastConfig';
 import { generateTransactionId, createSuccessMessage } from '../../utils/transactionId';
 import { CustomDropdown } from '../Purchases/CustomDropdown';
 import { useAuthStore } from '../../store/authStore';
+import { Loader } from '../common/Loader';
+import { toast } from 'sonner';
+import { useLoadingContext } from '../../context/LoadingContext';
 
 interface AccountFormProps {
   isOpen: boolean;
@@ -19,6 +21,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
   
   const { addAccount, updateAccount, loading, error } = useFinanceStore();
   const { profile } = useAuthStore();
+  const { wrapAsync, setLoadingMessage } = useLoadingContext();
 
   const [formData, setFormData] = useState({
     name: account?.name || '',
@@ -37,6 +40,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
   const [dpsTransferAmount, setDpsTransferAmount] = useState('');
   const [pendingDpsEnable, setPendingDpsEnable] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
   // Update form data when account prop changes
   React.useEffect(() => {
@@ -81,16 +85,22 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('AccountForm handleSubmit called with formData:', formData);
-    
+    if (submitting) return;
+    setSubmitting(true);
     if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
+      setSubmitting(false);
       return;
     }
     
+    // Wrap the entire submit process with loading state
+    const wrappedSubmit = wrapAsync(async () => {
+      setLoadingMessage(account ? 'Updating account...' : 'Saving account...');
+      setSubmitting(true);
+      try {
     const dpsInitial = parseFloat(formData.dps_initial_balance || '0');
     const mainInitial = parseFloat(formData.balance);
     const transactionId = generateTransactionId();
-    
     const accountData = {
       name: formData.name,
       type: formData.type as Account['type'],
@@ -102,7 +112,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
       dps_type: formData.has_dps ? formData.dps_type : null,
       dps_amount_type: formData.has_dps ? formData.dps_amount_type : null,
       dps_fixed_amount: formData.has_dps && formData.dps_amount_type === 'fixed' ? parseFloat(formData.dps_fixed_amount) : null,
-      isActive: account?.isActive ?? true,
+          isActive: typeof account?.isActive === 'boolean' ? account.isActive : true, // Use isActive for store
       dps_savings_account_id: account?.dps_savings_account_id || null,
       updated_at: new Date().toISOString(),
       transaction_id: transactionId
@@ -110,25 +120,33 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
 
     console.log('Account data to save:', accountData);
 
-    try {
       if (account) {
         console.log('Updating existing account');
         await updateAccount(account.id, accountData);
-        contextToasts.financial.accountUpdated(formData.name);
+          toast.success(`Account updated: ${formData.name}`);
       } else {
         console.log('Creating new account');
         await addAccount({
           ...accountData,
           dps_initial_balance: formData.has_dps ? dpsInitial : 0
         });
-        contextToasts.financial.accountCreated(formData.name);
+          toast.success(`Account created: ${formData.name}`);
       }
       console.log('Account saved successfully');
+        
+        // Add a small delay to ensure the loader animation is visible
+        await new Promise(resolve => setTimeout(resolve, 500));
       onClose();
     } catch (error) {
       console.error('Error saving account:', error);
-      contextToasts.errors.serverError();
+        toast.error('Failed to save account. Please try again.');
+      } finally {
+        setSubmitting(false);
     }
+    });
+    
+    // Execute the wrapped submit function
+    await wrappedSubmit();
   };
 
   const handleDpsCheckbox = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -159,6 +177,8 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
     : allCurrencyOptions;
 
   return (
+    <>
+      <Loader isLoading={submitting} message={account ? 'Updating account...' : 'Saving account...'} />
     <div className="fixed inset-0 flex items-center justify-center z-50">
       {/* Overlay */}
       <div
@@ -209,7 +229,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
                 }}
                 className={`${getInputClasses('name')} min-w-[200px]`}
                 required
-                disabled={loading}
+                  disabled={submitting}
                 placeholder="Enter account name"
               />
               {errors.name && (
@@ -234,7 +254,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
                 className={`${getInputClasses('balance')} min-w-[160px]`}
                 required
                 step="0.01"
-                disabled={loading}
+                  disabled={submitting}
                 placeholder="0.00"
               />
               {errors.balance && (
@@ -298,7 +318,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 className="w-full px-4 py-2 text-[14px] rounded-lg border transition-colors duration-200 bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600"
                 rows={3}
-                disabled={loading}
+                  disabled={submitting}
                 placeholder="Enter account description"
               />
             </div>
@@ -312,7 +332,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
               checked={formData.has_dps}
               onChange={handleDpsCheckbox}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              disabled={loading}
+                disabled={submitting}
             />
             <label htmlFor="has_dps" className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
               Enable DPS (Daily Personal Savings)
@@ -391,7 +411,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
                     className={`${getInputClasses('dps_fixed_amount')} min-w-[160px]`}
                     step="0.01"
                     min="0"
-                    disabled={loading}
+                      disabled={submitting}
                     placeholder="0.00"
                   />
                 </div>
@@ -409,7 +429,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
                   className={`${getInputClasses('dps_initial_balance')} min-w-[160px]`}
                   step="0.01"
                   min="0"
-                  disabled={loading}
+                    disabled={submitting}
                   placeholder="0.00"
                 />
               </div>
@@ -421,20 +441,21 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, accou
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
+                disabled={submitting}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="px-4 py-2 bg-gradient-primary text-white rounded-lg hover:bg-gradient-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
+                disabled={submitting}
             >
-              {loading ? 'Saving...' : account ? 'Update Account' : 'Create Account'}
+                {submitting ? 'Saving...' : account ? 'Update Account' : 'Create Account'}
             </button>
           </div>
         </form>
       </div>
     </div>
+    </>
   );
 };

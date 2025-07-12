@@ -104,9 +104,9 @@ export const DonationSavingsCard: React.FC<{ t: any; formatCurrency: any }> = ({
           dropdownMenuClassName="!bg-[#d3d3d3bf] !top-[20px]"
         />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-2 gap-4">
         {/* Total Donated */}
-        <div className="flex flex-col items-center justify-center bg-green-50 dark:bg-green-900/10 rounded-lg p-4">
+        <div className="w-full flex flex-col items-center justify-center bg-green-50 dark:bg-green-900/10 rounded-lg p-4">
           <div className="flex items-center mb-2">
             <Heart className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
             <span className="text-sm font-medium text-green-700 dark:text-green-300">Total Donated</span>
@@ -116,7 +116,7 @@ export const DonationSavingsCard: React.FC<{ t: any; formatCurrency: any }> = ({
           </span>
         </div>
         {/* Total Saved */}
-        <div className="flex flex-col items-center justify-center bg-red-50 dark:bg-red-900/40 rounded-lg p-4">
+        <div className="w-full flex flex-col items-center justify-center bg-red-50 dark:bg-red-900/40 rounded-lg p-4">
           <div className="flex items-center mb-2">
             <TrendingUp className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" />
             <span className="text-sm font-medium text-red-700 dark:text-red-300">Total Saved</span>

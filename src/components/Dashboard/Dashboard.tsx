@@ -25,6 +25,7 @@ import { NotesAndTodosWidget } from './NotesAndTodosWidget';
 import { PurchaseForm } from '../Purchases/PurchaseForm';
 import { useLoadingContext } from '../../context/LoadingContext';
 import { SkeletonCard, SkeletonChart } from '../common/Skeleton';
+import { LastWishCountdownWidget } from './LastWishCountdownWidget';
 
 interface DashboardProps {
   onViewChange: (view: string) => void;
@@ -107,6 +108,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onViewChange }) => {
     .filter(p => p.status === 'purchased')
     .sort((a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime())
     .slice(0, 5);
+
+  // Responsive state detection
+  const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      setIsMobile(width <= 767);
+      setIsTablet(width > 767 && width <= 1024);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   // Fetch purchases data when dashboard loads
   useEffect(() => {
@@ -199,37 +217,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ onViewChange }) => {
 
   // Calculate monthly trends data for line chart
   const getMonthlyTrends = () => {
-    const months = [];
-    const currentDate = new Date();
-    
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+    const last6Months = Array.from({ length: 6 }, (_, i) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      return {
+        month: date.toLocaleString('default', { month: 'short' }),
+        income: 0,
+        expenses: 0
+      };
+    }).reverse();
+
+    transactions.forEach(transaction => {
+      const transactionDate = new Date(transaction.date);
+      const monthIndex = last6Months.findIndex(m => 
+        new Date().getMonth() - (5 - last6Months.indexOf(m)) === transactionDate.getMonth()
+      );
       
-      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
-      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-      
-      const monthTransactions = transactions.filter(t => {
-        const transactionDate = new Date(t.date);
-        return transactionDate >= monthStart && transactionDate <= monthEnd;
-      });
-      
-      const income = monthTransactions
-        .filter(t => t.type === 'income' && !t.tags?.some(tag => tag.includes('transfer') || tag.includes('dps_transfer')))
-        .reduce((sum, t) => sum + t.amount, 0);
-      
-      const expenses = monthTransactions
-        .filter(t => t.type === 'expense' && !t.tags?.some(tag => tag.includes('transfer') || tag.includes('dps_transfer')))
-        .reduce((sum, t) => sum + t.amount, 0);
-      
-      months.push({
-        month: monthName,
-        income: Math.round(income * 100) / 100,
-        expenses: Math.round(expenses * 100) / 100
-      });
-    }
-    
-    return months;
+      if (monthIndex !== -1) {
+        if (transaction.type === 'income') {
+          last6Months[monthIndex].income += transaction.amount;
+        } else if (transaction.type === 'expense') {
+          last6Months[monthIndex].expenses += transaction.amount;
+        }
+      }
+    });
+
+    return last6Months;
   };
 
   const spendingData = getSpendingBreakdown();
@@ -252,16 +265,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onViewChange }) => {
   if (loading) {
     return (
       <>
-        <div className="flex">
-          {/* Main Content - Skeleton Loading */}
-          <div className="flex-1 pr-6 space-y-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Main Content Skeleton */}
+          <div className="flex-1 space-y-6">
             {/* Currency Sections Skeleton */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <SkeletonCard className="h-48" />
-              <SkeletonCard className="h-48" />
-            </div>
-
-            {/* Purchase Overview & Lend & Borrow Summary Row Skeleton */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <SkeletonCard className="h-64" />
               <SkeletonCard className="h-64" />
@@ -271,8 +278,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onViewChange }) => {
             <SkeletonCard className="h-80" />
           </div>
 
-          {/* Right Sidebar Skeleton */}
-          <div className="w-72 space-y-6">
+          {/* Right Sidebar Skeleton - Hidden on mobile, shown on desktop */}
+          <div className="hidden lg:block w-72 space-y-6">
             <SkeletonCard className="h-96" />
           </div>
         </div>
@@ -367,39 +374,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ onViewChange }) => {
   }
 
   return (
-    <div className="flex">
-      {/* Main Content */}
-      <div className="flex-1 pr-6 space-y-6">
-        {/* --- New Dashboard Widgets Top Row --- */}
-        {/* Removed all summary cards from the top row as requested */}
-        {/* --- End Dashboard Widgets Top Row --- */}
-
-        {/* Currency Sections */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="flex flex-col lg:flex-row gap-6">
+      {/* Main Content - Full width on mobile, flex-1 on desktop */}
+      <div className="flex-1 space-y-6">
+        {/* Currency Sections - Responsive grid */}
+        <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 gap-4 lg:gap-6">
           {stats.byCurrency.map(({ currency }) => (
-            <CurrencyOverviewCard
-              key={currency}
-              currency={currency}
-              transactions={allTransactions}
-              accounts={rawAccounts}
+            <div className="w-full">
+              <CurrencyOverviewCard
+                key={currency}
+                currency={currency}
+                transactions={allTransactions}
+                accounts={rawAccounts}
+                t={t}
+                formatCurrency={formatCurrency}
+              />
+            </div>
+          ))}
+          <div className="w-full">
+            <DonationSavingsCard
               t={t}
               formatCurrency={formatCurrency}
             />
-          ))}
-          <DonationSavingsCard
-            t={t}
-            formatCurrency={formatCurrency}
-          />
+          </div>
         </div>
 
-        {/* Donation & Savings Card */}
-        {/* Removed the extra grid wrapper around DonationSavingsCard */}
-
-        {/* Purchase Overview & Lend & Borrow Summary Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Purchase Overview & Lend & Borrow Summary Row - Responsive grid */}
+        <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 gap-4 lg:gap-6">
           {/* Purchase Overview */}
           {purchases.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
+            <div className="w-full bg-white dark:bg-gray-800 rounded-xl p-4 lg:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">Purchase Overview</h2>
                 <Link 
@@ -410,8 +414,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onViewChange }) => {
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
-              {/* Purchase Stats Cards */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              {/* Purchase Stats Cards - Responsive grid */}
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 lg:gap-4 mb-6">
                 <StatCard
                   title="Planned Purchases"
                   value={totalPlannedPurchases.toString()}
@@ -424,14 +428,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onViewChange }) => {
                   color="red"
                 />
               </div>
-              {/* Removed Smart Purchase Alerts block as it's now handled by the Urgent sidebar */}
             </div>
           )}
           {/* Lend & Borrow Summary Card */}
-          <LendBorrowSummaryCard />
+          <div className="w-full">
+            <LendBorrowSummaryCard />
+          </div>
         </div>
-        {/* Recent Transactions */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
+
+        {/* Recent Transactions - Full width on mobile */}
+        <div className="w-full bg-white dark:bg-gray-800 rounded-xl p-4 lg:p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t('dashboard.recentTransactions')}</h2>
             <Link 
@@ -444,14 +450,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onViewChange }) => {
           </div>
           <RecentTransactions />
         </div>
-        {/* Lend & Borrow Reminders Card */}
       </div>
 
-      {/* Right Sidebar */}
-      <div className="w-72 space-y-6">
-        {/* --- New Dashboard Widgets Sidebar --- */}
-        {/* Removed all summary cards from the sidebar as requested */}
-        {/* --- End Dashboard Widgets Sidebar --- */}
+      {/* Right Sidebar - Hidden on mobile, shown on desktop */}
+      <div className="hidden lg:block w-72 space-y-6">
+        <LastWishCountdownWidget />
+        <NotesAndTodosWidget />
+      </div>
+
+      {/* Mobile Bottom Section - Notes/Todos moved to bottom on mobile */}
+      <div className="lg:hidden">
+        <LastWishCountdownWidget />
         <NotesAndTodosWidget />
       </div>
 

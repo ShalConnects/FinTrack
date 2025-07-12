@@ -15,6 +15,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuthStore } from '../../store/authStore';
 import { startOfToday, startOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, endOfWeek, endOfDay } from 'date-fns';
+import { useLoadingContext } from '../../context/LoadingContext';
 
 export const TransactionList: React.FC<{ 
   transactions: Transaction[];
@@ -26,6 +27,7 @@ export const TransactionList: React.FC<{
   const accounts = getActiveAccounts();
   const activeTransactions = getActiveTransactions();
   const { profile } = useAuthStore();
+  const { wrapAsync, setLoadingMessage } = useLoadingContext();
 
   // Filters
   const [filters, setFilters] = useState({
@@ -293,6 +295,9 @@ export const TransactionList: React.FC<{
     const transaction = transactions.find(t => t.id === transactionId);
     if (!transaction) return;
     
+    // Wrap the delete process with loading state
+    const wrappedDelete = wrapAsync(async () => {
+      setLoadingMessage('Deleting transaction...');
     try {
       await deleteTransaction(transaction.id);
       toast.success('Transaction deleted successfully');
@@ -300,6 +305,10 @@ export const TransactionList: React.FC<{
       console.error('Error deleting transaction:', error);
       toast.error('Failed to delete transaction');
     }
+    });
+    
+    // Execute the wrapped delete function
+    await wrappedDelete();
   };
 
 

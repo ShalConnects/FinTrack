@@ -26,6 +26,7 @@ import { supabase } from '../../lib/supabase';
 
 interface LastWishProps {
   setActiveTab?: (tab: string) => void;
+  forceFreeAccess?: boolean;
 }
 
 interface LastWishSettings {
@@ -50,13 +51,13 @@ interface LastWishSettings {
   isActive: boolean;
 }
 
-export const LastWish: React.FC<LastWishProps> = ({ setActiveTab }) => {
+export const LastWish: React.FC<LastWishProps> = ({ setActiveTab, forceFreeAccess }) => {
   const { user, profile } = useAuthStore();
   const { accounts, transactions, purchases, donationSavingRecords } = useFinanceStore();
   const [lendBorrowRecords, setLendBorrowRecords] = useState<any[]>([]);
   
-  // Check if user has premium subscription
-  const isPremium = profile?.subscription?.plan === 'premium' && profile?.subscription?.status === 'active';
+  // Check if user has premium subscription, or force access for testing
+  const isPremium = forceFreeAccess || (profile?.subscription?.plan === 'premium' && profile?.subscription?.status === 'active');
   const [settings, setSettings] = useState<LastWishSettings>({
     isEnabled: false,
     checkInFrequency: 30,
